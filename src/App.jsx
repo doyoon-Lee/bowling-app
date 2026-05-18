@@ -580,8 +580,9 @@ export default function App() {
             <p>{user?.email}</p>
           </div>
           <div className="headerActions">
-            <div className={isRealtimeReady ? "status live" : "status off"}>{isRealtimeReady ? "LIVE" : "OFF"}</div>
-            <button className="logoutButton" onClick={signOut}>로그아웃</button>
+            <button className="logoutButton" onClick={signOut}>
+              로그아웃
+            </button>
           </div>
         </header>
 
