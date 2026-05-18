@@ -226,7 +226,7 @@ function formatPinButton(pins, next, rolls) {
   return String(pins);
 }
 
-const keypadNumbers = [1, 2, 3, 4, 5, 6, 7, 8, 9, 0];
+const keypadNumbers = [1, 2, 3, 4, 5, 6, 7, 8, 9, 0, 10];
 
 function renderFrameMark(mark) {
   if (!mark) return <span className="markEmpty">&nbsp;</span>;
@@ -612,12 +612,17 @@ export default function App() {
 
           <div className="keypadTitle">핀 수 입력</div>
           <div className="pinGrid keypad">
-            {keypadNumbers.map((pins) => (
+            {keypadNumbers
+            .filter((pins) => {
+              if (pins !== 10) return true;
+              return next?.canStrike;
+            })
+            .map((pins) => (
               <button
                 key={pins}
                 disabled={!next || pins > next.max || (pins === 10 && !next.canStrike)}
                 onClick={() => addRoll(pins)}
-                className="pin"
+                className={pins === 10 && next?.canStrike ? "pin strike" : "pin"}
               >
                 {formatPinButton(pins, next, rolls)}
               </button>
