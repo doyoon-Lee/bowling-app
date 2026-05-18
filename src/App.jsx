@@ -152,10 +152,34 @@ function getFrameRollLimit(rolls) {
   return null;
 }
 
-function formatPinButton(pins, next) {
+function formatPinButton(pins, next, rolls) {
   if (!next) return String(pins);
+
   if (pins === 10 && next.canStrike) return "X";
+
+  if (next.rollInFrame === 2) {
+    const currentFrameStart = next.frame === 1
+      ? 0
+      : (() => {
+          let idx = 0;
+          for (let f = 1; f < next.frame; f++) {
+            idx += rolls[idx] === 10 && f < 10 ? 1 : 2;
+          }
+          return idx;
+        })();
+
+    const firstRoll = rolls[currentFrameStart];
+
+    if (firstRoll !== undefined) {
+      const spareValue = 10 - firstRoll;
+
+      if (pins === spareValue) return "/";
+      if (pins === 0) return "-";
+    }
+  }
+
   if (pins === 0) return "-";
+
   return String(pins);
 }
 
@@ -334,7 +358,7 @@ export default function App() {
                 onClick={() => addRoll(pins)}
                 className={pins === 10 && next?.canStrike ? "pin strike" : "pin"}
               >
-                {formatPinButton(pins, next)}
+                {formatPinButton(pins, next, rolls)}
               </button>
             ))}
           </div>
