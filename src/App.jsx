@@ -199,16 +199,19 @@ function formatPinButton(pins, next, rolls) {
   if (pins === 10 && next.canStrike) return "X";
 
   if (next.rollInFrame === 2) {
-    const currentFrameStart = getCurrentFrameStartIndex(rolls, next.frame);
-    const firstRoll = rolls[currentFrameStart];
+  const currentFrameStart = getCurrentFrameStartIndex(rolls, next.frame);
+  const firstRoll = rolls[currentFrameStart];
 
-    if (firstRoll !== undefined) {
-      const spareValue = 10 - firstRoll;
+  if (firstRoll !== undefined) {
+    const spareValue = 10 - firstRoll;
 
-      if (pins === spareValue) return "/";
-      if (pins === 0) return "-";
-    }
+    // 스페어 우선 처리
+    if (pins === spareValue) return "/";
+
+    // 초구가 거터가 아닐 때만 후구 거터 표시
+    if (pins === 0 && firstRoll !== 0) return "-";
   }
+}
 
   if (next.frame === 10 && next.rollInFrame === 3) {
     const currentFrameStart = getCurrentFrameStartIndex(rolls, 10);
