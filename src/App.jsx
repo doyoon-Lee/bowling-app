@@ -42,7 +42,10 @@ function formatFrameMark(first, second, third, frame) {
     else secondMark = formatRollMark(second);
   }
 
-  if (third !== undefined) thirdMark = formatRollMark(third);
+  if (third !== undefined) {
+    if (first === 10 && second !== 10 && second + third === 10) thirdMark = "/";
+    else thirdMark = formatRollMark(third);
+  }
 
   return [firstMark, secondMark, thirdMark].filter(Boolean).join(" | ");
 }
@@ -160,13 +163,34 @@ function getFrameRollLimit(rolls) {
 
   if (tenth.length === 2) {
     const [a, b] = tenth;
-    if (a === 10 || a + b === 10) {
+
+    if (a === 10) {
+      if (b === 10) {
+        return { frame: 10, rollInFrame: 3, max: 10, canStrike: true };
+      }
+
+      return { frame: 10, rollInFrame: 3, max: 10 - b, canStrike: false };
+    }
+
+    if (a + b === 10) {
       return { frame: 10, rollInFrame: 3, max: 10, canStrike: true };
     }
+
     return null;
   }
 
   return null;
+}
+
+function getCurrentFrameStartIndex(rolls, frame) {
+  let idx = 0;
+
+  for (let f = 1; f < frame; f++) {
+    if (rolls[idx] === 10 && f < 10) idx += 1;
+    else idx += 2;
+  }
+
+  return idx;
 }
 
 function formatPinButton(pins, next, rolls) {
@@ -175,16 +199,7 @@ function formatPinButton(pins, next, rolls) {
   if (pins === 10 && next.canStrike) return "X";
 
   if (next.rollInFrame === 2) {
-    const currentFrameStart = next.frame === 1
-      ? 0
-      : (() => {
-          let idx = 0;
-          for (let f = 1; f < next.frame; f++) {
-            idx += rolls[idx] === 10 && f < 10 ? 1 : 2;
-          }
-          return idx;
-        })();
-
+    const currentFrameStart = getCurrentFrameStartIndex(rolls, next.frame);
     const firstRoll = rolls[currentFrameStart];
 
     if (firstRoll !== undefined) {
@@ -192,6 +207,17 @@ function formatPinButton(pins, next, rolls) {
 
       if (pins === spareValue) return "/";
       if (pins === 0) return "-";
+    }
+  }
+
+  if (next.frame === 10 && next.rollInFrame === 3) {
+    const currentFrameStart = getCurrentFrameStartIndex(rolls, 10);
+    const firstRoll = rolls[currentFrameStart];
+    const secondRoll = rolls[currentFrameStart + 1];
+
+    if (firstRoll === 10 && secondRoll !== 10) {
+      const spareValue = 10 - secondRoll;
+      if (pins === spareValue) return "/";
     }
   }
 
@@ -203,14 +229,27 @@ function formatPinButton(pins, next, rolls) {
 const keypadNumbers = [1, 2, 3, 4, 5, 6, 7, 8, 9, 0, 10];
 
 function renderFrameMark(mark) {
-  if (!mark) return null;
+  if (!mark) return <span className="markEmpty">&nbsp;</span>;
 
-  return mark.split("|").map((part, index, array) => (
+  const parts = String(mark)
+    .split("|")
+    .map((part) => part.trim())
+    .filter((part) => part.length > 0);
+
+  if (parts.length === 1) {
+    return <span className="markPart single">{parts[0]}</span>;
+  }
+
+  return parts.map((part, index) => (
     <React.Fragment key={`${part}-${index}`}>
-      <span className="markPart">{part.trim()}</span>
-      {index < array.length - 1 && <span className="markDivider">|</span>}
+      <span className="markPart">{part}</span>
+      {index < parts.length - 1 && <span className="markDivider">|</span>}
     </React.Fragment>
   ));
+}
+
+function displayTotal(total) {
+  return total === "" || total === undefined || total === null ? " " : total;
 }
 
 export default function App() {
@@ -376,7 +415,7 @@ export default function App() {
                 <div className="frameBox" key={i}>
                   <div className="frameNo">{i + 1}</div>
                   <div className="frameMark">{renderFrameMark(frame?.mark)}</div>
-                  <div className="frameTotal">{frame?.total || ""}</div>
+                  <div className="frameTotal">{displayTotal(frame?.total)}</div>
                 </div>
               );
             })}
@@ -426,7 +465,7 @@ export default function App() {
                       <div className="recordFrame" key={frame.frame}>
                         <span>{frame.frame}</span>
                         <b>{renderFrameMark(frame.mark)}</b>
-                        <em>{frame.total || ""}</em>
+                        <em>{displayTotal(frame.total)}</em>
                       </div>
                     ))}
                   </div>
