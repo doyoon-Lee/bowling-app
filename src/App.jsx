@@ -493,13 +493,25 @@ export default function App() {
       frames: result.frames,
     };
 
-    const { error } = await client.from("bowling_games").insert(payload);
+    const { data: savedRecord, error } = await client
+      .from("bowling_games")
+      .insert(payload)
+      .select("id, user_id, user_email, player_name, place, total, rolls, frames, created_at")
+      .single();
 
     setIsSaving(false);
 
     if (error) {
       alert(`저장 실패: ${error.message}`);
       return;
+    }
+
+    if (savedRecord) {
+      setRecords((prev) => {
+        const alreadyExists = prev.some((record) => record.id === savedRecord.id);
+        if (alreadyExists) return prev;
+        return [savedRecord, ...prev];
+      });
     }
 
     setRolls([]);
