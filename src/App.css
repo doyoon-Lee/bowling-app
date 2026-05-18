@@ -13,6 +13,12 @@ input {
   font-family: inherit;
 }
 
+body,
+html,
+#root {
+  min-height: 100%;
+}
+
 .app {
   min-height: 100vh;
   padding: 12px;
@@ -123,7 +129,7 @@ input {
 
 .laneScoreboard {
   display: grid;
-  grid-template-columns: repeat(10, 58px);
+  grid-template-columns: repeat(9, 58px) 82px;
   gap: 4px;
   margin-top: 12px;
   overflow-x: auto;
@@ -149,6 +155,15 @@ input {
   overflow: hidden;
   border: 1px solid #7dd3fc;
   background: #0369a1;
+}
+
+.frameBox:nth-child(10) {
+  min-width: 82px;
+}
+
+.frameBox:nth-child(10) .frameMark {
+  font-size: 12px;
+  gap: 4px;
 }
 
 .frameNo {
@@ -337,7 +352,7 @@ input {
 
 .recordFrames {
   display: grid;
-  grid-template-columns: repeat(10, 58px);
+  grid-template-columns: repeat(9, 58px) 82px;
   gap: 4px;
   margin-top: 10px;
   overflow-x: auto;
@@ -350,6 +365,15 @@ input {
   overflow: hidden;
   border: 1px solid #334155;
   background: #020617;
+}
+
+.recordFrame:nth-child(10) {
+  min-width: 82px;
+}
+
+.recordFrame:nth-child(10) b {
+  font-size: 10px;
+  gap: 4px;
 }
 
 .recordFrame span {
