@@ -252,6 +252,40 @@ function displayTotal(total) {
   return total === "" || total === undefined || total === null ? " " : total;
 }
 
+function getKoreaDateKey(dateValue) {
+  return new Intl.DateTimeFormat("sv-SE", {
+    timeZone: "Asia/Seoul",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).format(new Date(dateValue));
+}
+
+function getKoreaDateLabel(dateKey) {
+  const [year, month, day] = dateKey.split("-");
+  return `${year}.${month}.${day}`;
+}
+
+function groupRecordsByDate(records) {
+  return records.reduce((groups, record) => {
+    const dateKey = getKoreaDateKey(record.created_at);
+    if (!groups[dateKey]) groups[dateKey] = [];
+    groups[dateKey].push(record);
+    return groups;
+  }, {});
+}
+
+function getDayAverage(records) {
+  if (!records.length) return 0;
+  const total = records.reduce((sum, record) => sum + Number(record.total || 0), 0);
+  return Math.round(total / records.length);
+}
+
+function getDayHigh(records) {
+  if (!records.length) return 0;
+  return Math.max(...records.map((record) => Number(record.total || 0)));
+}
+
 export default function App() {
   const [playerName, setPlayerName] = useState("");
   const [place, setPlace] = useState("");
@@ -263,6 +297,8 @@ export default function App() {
 
   const result = useMemo(() => calcBowlingScore(rolls), [rolls]);
   const maxPossible = useMemo(() => calcMaxPossibleScore(rolls), [rolls]);
+  const groupedRecords = useMemo(() => groupRecordsByDate(records), [records]);
+  const sortedDateKeys = useMemo(() => Object.keys(groupedRecords).sort((a, b) => b.localeCompare(a)), [groupedRecords]);
   const next = getFrameRollLimit(rolls);
 
   useEffect(() => {
@@ -445,33 +481,53 @@ export default function App() {
         </section>
 
         <section className="history">
-          <h2>실시간 기록</h2>
+          <h2>날짜별 기록</h2>
 
-          {records.length === 0 ? (
+          {sortedDateKeys.length === 0 ? (
             <div className="empty">저장된 기록이 없습니다.</div>
           ) : (
-            records.map((record) => (
-              <article className="record" key={record.id}>
-                <div className="recordMain">
-                  <div className="recordTop">
-                    <strong>{record.total}점</strong>
-                    <button onClick={() => deleteRecord(record.id)}>삭제</button>
+            sortedDateKeys.map((dateKey) => {
+              const dayRecords = groupedRecords[dateKey];
+              return (
+                <section className="dateGroup" key={dateKey}>
+                  <div className="dateHeader">
+                    <div>
+                      <strong>{getKoreaDateLabel(dateKey)}</strong>
+                      <span>{dayRecords.length}게임</span>
+                    </div>
+                    <div className="dateStats">
+                      <span>AVG {getDayAverage(dayRecords)}</span>
+                      <span>HIGH {getDayHigh(dayRecords)}</span>
+                    </div>
                   </div>
-                  <p>{record.player_name} · {record.place || "장소 미입력"}</p>
-                  <small>{new Date(record.created_at).toLocaleString()}</small>
 
-                  <div className="recordFrames">
-                    {(record.frames || []).map((frame) => (
-                      <div className="recordFrame" key={frame.frame}>
-                        <span>{frame.frame}</span>
-                        <b>{renderFrameMark(frame.mark)}</b>
-                        <em>{displayTotal(frame.total)}</em>
+                  {dayRecords.map((record) => (
+                    <details className="record compactRecord" key={record.id}>
+                      <summary>
+                        <div>
+                          <strong>{record.total}점</strong>
+                          <p>{record.player_name} · {record.place || "장소 미입력"}</p>
+                        </div>
+                        <span>{new Date(record.created_at).toLocaleTimeString("ko-KR", { hour: "2-digit", minute: "2-digit" })}</span>
+                      </summary>
+
+                      <div className="recordDetail">
+                        <button onClick={() => deleteRecord(record.id)}>삭제</button>
+                        <div className="recordFrames">
+                          {(record.frames || []).map((frame) => (
+                            <div className="recordFrame" key={frame.frame}>
+                              <span>{frame.frame}</span>
+                              <b>{renderFrameMark(frame.mark)}</b>
+                              <em>{displayTotal(frame.total)}</em>
+                            </div>
+                          ))}
+                        </div>
                       </div>
-                    ))}
-                  </div>
-                </div>
-              </article>
-            ))
+                    </details>
+                  ))}
+                </section>
+              );
+            })
           )}
         </section>
       </section>
