@@ -16,31 +16,75 @@ async function getSupabaseClient() {
   return supabase;
 }
 
+function formatRollMark(value) {
+  if (value === undefined || value === null) return "";
+  if (value === 10) return "X";
+  if (value === 0) return "-";
+  return String(value);
+}
+
 function calcBowlingScore(rolls) {
   let score = 0;
   let rollIndex = 0;
   const frames = [];
 
   for (let frame = 1; frame <= 10; frame++) {
-    const first = Number(rolls[rollIndex] ?? 0);
-    const second = Number(rolls[rollIndex + 1] ?? 0);
+    const first = rolls[rollIndex];
+    const second = rolls[rollIndex + 1];
 
-    if (first === 10) {
-      const bonus1 = Number(rolls[rollIndex + 1] ?? 0);
-      const bonus2 = Number(rolls[rollIndex + 2] ?? 0);
-      score += 10 + bonus1 + bonus2;
-      frames.push({ frame, mark: "X", total: score });
-      rollIndex += 1;
-    } else if (first + second === 10) {
-      const bonus = Number(rolls[rollIndex + 2] ?? 0);
-      score += 10 + bonus;
-      frames.push({ frame, mark: `${first}/`, total: score });
+    if (frame < 10) {
+      if (first === undefined) {
+        frames.push({ frame, mark: "", total: "" });
+        continue;
+      }
+
+      if (first === 10) {
+        const bonus1 = Number(rolls[rollIndex + 1] ?? 0);
+        const bonus2 = Number(rolls[rollIndex + 2] ?? 0);
+        score += 10 + bonus1 + bonus2;
+        frames.push({ frame, mark: "X", total: score });
+        rollIndex += 1;
+        continue;
+      }
+
+      if (second === undefined) {
+        frames.push({ frame, mark: formatRollMark(first), total: "" });
+        continue;
+      }
+
+      if (first + second === 10) {
+        const bonus = Number(rolls[rollIndex + 2] ?? 0);
+        score += 10 + bonus;
+        frames.push({ frame, mark: `${formatRollMark(first)}/`, total: score });
+      } else {
+        score += first + second;
+        frames.push({ frame, mark: `${formatRollMark(first)} ${formatRollMark(second)}`, total: score });
+      }
+
       rollIndex += 2;
-    } else {
-      score += first + second;
-      frames.push({ frame, mark: `${first}-${second}`, total: score });
-      rollIndex += 2;
+      continue;
     }
+
+    const tenthRolls = rolls.slice(rollIndex);
+    if (tenthRolls.length === 0) {
+      frames.push({ frame, mark: "", total: "" });
+      continue;
+    }
+
+    const [a, b, c] = tenthRolls;
+    let tenthMark = formatRollMark(a);
+
+    if (b !== undefined) {
+      if (a !== 10 && a + b === 10) tenthMark += " /";
+      else tenthMark += ` ${formatRollMark(b)}`;
+    }
+
+    if (c !== undefined) {
+      tenthMark += ` ${formatRollMark(c)}`;
+    }
+
+    score += tenthRolls.reduce((sum, roll) => sum + Number(roll ?? 0), 0);
+    frames.push({ frame, mark: tenthMark, total: score });
   }
 
   return { total: score, frames };
@@ -91,12 +135,15 @@ function getFrameRollLimit(rolls) {
 function formatPinButton(pins, next) {
   if (!next) return String(pins);
   if (pins === 10 && next.canStrike) return "X";
+  if (pins === 0) return "-";
   return String(pins);
 }
 
 function formatRolls(rolls) {
-  return rolls.map((roll) => (roll === 10 ? "X" : roll)).join(" · ");
+  return rolls.map((roll) => formatRollMark(roll)).join(" · ");
 }
+
+const keypadNumbers = [1, 2, 3, 4, 5, 6, 7, 8, 9, 0, 10];
 
 export default function App() {
   const [playerName, setPlayerName] = useState("나");
@@ -243,11 +290,11 @@ export default function App() {
             })}
           </div>
 
-          <div className="pinGrid">
-            {Array.from({ length: 11 }, (_, pins) => (
+          <div className="pinGrid keypad">
+            {keypadNumbers.map((pins) => (
               <button
                 key={pins}
-                disabled={!next || pins > next.max}
+                disabled={!next || pins > next.max || (pins === 10 && !next.canStrike)}
                 onClick={() => addRoll(pins)}
                 className={pins === 10 && next?.canStrike ? "pin strike" : "pin"}
               >

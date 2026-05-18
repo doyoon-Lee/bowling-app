@@ -182,3 +182,119 @@
     border-right-color: var(--border);
   }
 }
+
+.pinGrid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 12px;
+  margin-top: 16px;
+}
+
+.pin {
+  height: 64px;
+  border: none;
+  border-radius: 18px;
+  background: #ffffff;
+  font-size: 24px;
+  font-weight: 700;
+  box-shadow: 0 2px 10px rgba(0,0,0,0.08);
+  transition: 0.15s;
+}
+
+.pin:active {
+  transform: scale(0.96);
+}
+
+.pin:disabled {
+  opacity: 0.25;
+}
+
+.pin.strike {
+  background: #111111;
+  color: white;
+}
+
+.buttonGrid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 10px;
+  margin-top: 20px;
+}
+
+.buttonGrid button {
+  height: 48px;
+  border: none;
+  border-radius: 14px;
+  font-weight: 600;
+  background: #ececec;
+}
+
+.buttonGrid .primary {
+  background: #111111;
+  color: white;
+}
+
+.frames {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 8px;
+  margin-top: 16px;
+}
+
+.frame {
+  background: white;
+  border-radius: 14px;
+  padding: 10px;
+  text-align: center;
+  box-shadow: 0 1px 6px rgba(0,0,0,0.05);
+}
+
+.scoreBox {
+  margin-top: 14px;
+  background: #111111;
+  color: white;
+  border-radius: 22px;
+  padding: 22px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.scoreBox strong {
+  font-size: 52px;
+  line-height: 1;
+}
+
+.inputGrid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+
+.inputGrid input {
+  height: 46px;
+  border-radius: 12px;
+  border: 1px solid #ddd;
+  padding: 0 14px;
+  font-size: 15px;
+}
+
+.card {
+  background: #f7f7f7;
+  border-radius: 24px;
+  padding: 18px;
+}
+
+.history {
+  margin-top: 24px;
+}
+
+.record {
+  background: white;
+  border-radius: 16px;
+  padding: 14px;
+  margin-top: 10px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
