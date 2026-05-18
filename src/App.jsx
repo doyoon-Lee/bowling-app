@@ -644,7 +644,21 @@ export default function App() {
             .map((pins) => (
               <button
                 key={pins}
-                disabled={!next || pins > next.max || (pins === 10 && !next.canStrike)}
+                disabled={
+                !next ||
+                pins > next.max ||
+                (
+                  pins === 10 &&
+                  !next.canStrike &&
+                  !(
+                    next.rollInFrame === 2 &&
+                    (() => {
+                      const currentFrameStart = getCurrentFrameStartIndex(rolls, next.frame);
+                      return rolls[currentFrameStart] === 0;
+                    })()
+                  )
+                )
+              }
                 onClick={() => addRoll(pins)}
                 className={pins === 10 && next?.canStrike ? "pin strike" : "pin"}
               >
