@@ -286,6 +286,31 @@ function getDayHigh(records) {
   return Math.max(...records.map((record) => Number(record.total || 0)));
 }
 
+function isInAppBrowser() {
+  const ua = navigator.userAgent.toLowerCase();
+
+  return (
+    ua.includes("naver") ||
+    ua.includes("kakaotalk") ||
+    ua.includes("instagram") ||
+    ua.includes("fbav") ||
+    ua.includes("line")
+  );
+}
+
+function openCurrentPageInExternalBrowser() {
+  const currentUrl = window.location.href;
+  const urlWithoutProtocol = currentUrl.replace(/^https?:\/\//, "");
+  const ua = navigator.userAgent.toLowerCase();
+
+  if (/android/i.test(ua)) {
+    window.location.href = `intent://${urlWithoutProtocol}#Intent;scheme=https;package=com.android.chrome;end`;
+    return;
+  }
+
+  window.location.href = currentUrl;
+}
+
 export default function App() {
   const [session, setSession] = useState(null);
   const [authLoading, setAuthLoading] = useState(true);
@@ -373,7 +398,7 @@ export default function App() {
           .select("id, user_id, user_email, player_name, place, total, rolls, frames, created_at")
           .eq("user_id", user.id)
           .order("created_at", { ascending: false })
-          .limit(100);
+          .limit(1000);
 
         if (!error && data && mounted) setRecords(data);
       };
@@ -400,49 +425,28 @@ export default function App() {
     };
   }, [user]);
 
-const signInWithGoogle = async () => {
-  const client = await getSupabaseClient();
-
-  if (!client) {
-    alert(".env 파일 확인");
-    return;
-  }
-
-  const ua = navigator.userAgent.toLowerCase();
-
-  const isInAppBrowser =
-    ua.includes("naver") ||
-    ua.includes("kakaotalk") ||
-    ua.includes("instagram") ||
-    ua.includes("fbav");
-
-  const currentUrl = window.location.origin;
-
-  if (isInAppBrowser) {
-    const externalUrl = `googlechrome://${window.location.host}`;
-
-    alert("네이버/카카오 앱에서는 로그인 제한이 있어 Chrome으로 이동합니다.");
-
-    if (/android/i.test(ua)) {
-      window.location.href = externalUrl;
-    } else {
-      window.location.href = currentUrl;
+  const signInWithGoogle = async () => {
+    if (isInAppBrowser()) {
+      alert("네이버/카카오 앱 내부 브라우저에서는 Google 로그인이 차단될 수 있습니다. Chrome으로 이동합니다.");
+      openCurrentPageInExternalBrowser();
+      return;
     }
 
-    return;
-  }
+    const client = await getSupabaseClient();
+    if (!client) {
+      alert(".env 파일에 VITE_SUPABASE_URL, VITE_SUPABASE_ANON_KEY를 설정해야 합니다.");
+      return;
+    }
 
-  const { error } = await client.auth.signInWithOAuth({
-    provider: "google",
-    options: {
-      redirectTo: currentUrl,
-    },
-  });
+    const { error } = await client.auth.signInWithOAuth({
+      provider: "google",
+      options: {
+        redirectTo: window.location.origin,
+      },
+    });
 
-  if (error) {
-    alert(`구글 로그인 실패: ${error.message}`);
-  }
-};
+    if (error) alert(`구글 로그인 실패: ${error.message}`);
+  };
 
   const signOut = async () => {
     const client = await getSupabaseClient();
@@ -522,16 +526,25 @@ const signInWithGoogle = async () => {
   }
 
   if (!session) {
+    const inAppBrowser = isInAppBrowser();
+
     return (
       <main className="app">
         <section className="container">
           <div className="loginCard">
             <h1>🎳 Bowling Score</h1>
             <p>구글 계정으로 로그인하고 개인 볼링 기록을 저장하세요.</p>
-            <small className="loginNotice">
-            네이버/카카오 앱에서는 Chrome으로 열어주세요.
-          </small>
-            <button className="googleLoginButton" onClick={signInWithGoogle}>Google 계정으로 로그인</button>
+
+            {inAppBrowser && (
+              <div className="browserNotice">
+                <strong>외부 브라우저가 필요합니다.</strong>
+                <span>네이버/카카오 앱 내부 브라우저에서는 Google 로그인이 차단될 수 있습니다.</span>
+              </div>
+            )}
+
+            <button className="googleLoginButton" onClick={signInWithGoogle}>
+              {inAppBrowser ? "Chrome으로 열기" : "Google 계정으로 로그인"}
+            </button>
           </div>
         </section>
       </main>
