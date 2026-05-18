@@ -203,7 +203,7 @@ function formatPinButton(pins, next, rolls) {
 const keypadNumbers = [1, 2, 3, 4, 5, 6, 7, 8, 9, 0, 10];
 
 export default function App() {
-  const [playerName, setPlayerName] = useState("나");
+  const [playerName, setPlayerName] = useState("");
   const [place, setPlace] = useState("");
   const [rolls, setRolls] = useState([]);
   const [records, setRecords] = useState([]);
@@ -286,6 +286,11 @@ export default function App() {
   const saveGame = async () => {
     if (rolls.length === 0 || isSaving) return;
 
+    if (!playerName.trim()) {
+      alert("이름을 넣어주세요.");
+      return;
+    }
+
     const client = await getSupabaseClient();
     if (!client) {
       alert(".env 파일에 VITE_SUPABASE_URL, VITE_SUPABASE_ANON_KEY를 설정해야 합니다.");
@@ -295,7 +300,7 @@ export default function App() {
     setIsSaving(true);
 
     const payload = {
-      player_name: playerName || "나",
+      player_name: playerName.trim(),
       place,
       total: result.total,
       rolls,
@@ -335,8 +340,8 @@ export default function App() {
 
         <section className="scoreboardCard">
           <div className="playerBar">
-            <input value={playerName} onChange={(e) => setPlayerName(e.target.value)} placeholder="이름" />
-            <input value={place} onChange={(e) => setPlace(e.target.value)} placeholder="볼링장" />
+            <input value={playerName} onChange={(e) => setPlayerName(e.target.value)} placeholder="이름을 적어주세요" />
+            <input value={place} onChange={(e) => setPlace(e.target.value)} placeholder="볼링장 이름을 기입해주세요" />
           </div>
 
           <div className="summaryBoard">
