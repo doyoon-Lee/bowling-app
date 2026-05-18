@@ -226,7 +226,7 @@ function formatPinButton(pins, next, rolls) {
   return String(pins);
 }
 
-const keypadNumbers = [1, 2, 3, 4, 5, 6, 7, 8, 9, 0, 10];
+const keypadNumbers = [1, 2, 3, 4, 5, 6, 7, 8, 9, 0];
 
 function renderFrameMark(mark) {
   if (!mark) return <span className="markEmpty">&nbsp;</span>;
@@ -617,7 +617,7 @@ export default function App() {
                 key={pins}
                 disabled={!next || pins > next.max || (pins === 10 && !next.canStrike)}
                 onClick={() => addRoll(pins)}
-                className={pins === 10 && next?.canStrike ? "pin strike" : "pin"}
+                className="pin"
               >
                 {formatPinButton(pins, next, rolls)}
               </button>
