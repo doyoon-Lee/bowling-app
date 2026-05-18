@@ -8,6 +8,11 @@ body {
   font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
 }
 
+button,
+input {
+  font-family: inherit;
+}
+
 .app {
   min-height: 100vh;
   padding: 12px;
@@ -77,7 +82,11 @@ body {
   background: #020617;
   color: white;
   padding: 0 12px;
-  font-size: 15px;
+  font-size: 14px;
+}
+
+.playerBar input::placeholder {
+  color: #64748b;
 }
 
 .summaryBoard {
@@ -102,13 +111,13 @@ body {
 }
 
 .summaryBoard strong {
-  font-size: 32px;
+  font-size: 30px;
   line-height: 1;
   color: #38bdf8;
 }
 
 .summaryBoard .smallScore {
-  font-size: 20px;
+  font-size: 18px;
   color: #facc15;
 }
 
@@ -116,62 +125,105 @@ body {
   display: grid;
   grid-template-columns: repeat(10, 58px);
   gap: 4px;
-  margin-top: 10px;
+  margin-top: 12px;
   overflow-x: auto;
   padding-bottom: 6px;
   scroll-behavior: smooth;
   -webkit-overflow-scrolling: touch;
 }
 
+.laneScoreboard::-webkit-scrollbar,
+.recordFrames::-webkit-scrollbar {
+  height: 6px;
+}
+
+.laneScoreboard::-webkit-scrollbar-thumb,
+.recordFrames::-webkit-scrollbar-thumb {
+  background: #334155;
+  border-radius: 999px;
+}
+
 .frameBox {
-  min-width: 42px;
-  background: #0369a1;
+  min-width: 58px;
+  border-radius: 10px;
+  overflow: hidden;
   border: 1px solid #7dd3fc;
-  text-align: center;
+  background: #0369a1;
 }
 
 .frameNo {
+  height: 22px;
   background: #075985;
   color: #a7f3d0;
-  font-size: 12px;
+  font-size: 11px;
   font-weight: 800;
-  padding: 2px 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.frameMark {
+  height: 34px;
+  background: #e0f2fe;
+  color: #0f172a;
+  font-size: 13px;
+  font-weight: 900;
+  border-bottom: 1px solid #7dd3fc;
+}
+
+.frameTotal {
+  height: 30px;
+  color: white;
+  font-size: 16px;
+  font-weight: 900;
+  background: #0369a1;
 }
 
 .frameMark,
 .recordFrame b {
+  min-height: 30px;
+  display: flex !important;
+  flex-direction: row !important;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  white-space: nowrap;
+  line-height: 1;
+}
+
+.frameTotal,
+.recordFrame em {
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 6px;
-  white-space: nowrap;
 }
 
 .markPart {
-  display: inline-block;
+  display: inline-flex;
   min-width: 12px;
-  text-align: center;
+  justify-content: center;
+  align-items: center;
+}
+
+.markPart.single {
+  min-width: auto;
 }
 
 .markDivider {
+  display: inline-flex;
   color: #64748b;
-  font-weight: 700;
+  font-weight: 800;
 }
 
-.frameTotal {
-  height: 28px;
-  color: white;
-  font-size: 16px;
-  font-weight: 900;
-  display: flex;
-  align-items: center;
-  justify-content: center;
+.markEmpty {
+  visibility: hidden;
 }
 
 .keypadTitle {
   margin-top: 14px;
   margin-bottom: 8px;
   color: #cbd5e1;
+  font-size: 14px;
   font-weight: 800;
 }
 
@@ -182,13 +234,18 @@ body {
 }
 
 .pin {
-  height: 54px;
+  height: 56px;
   border: none;
   border-radius: 14px;
   background: #e5e7eb;
   color: #0f172a;
   font-size: 22px;
   font-weight: 900;
+  transition: 0.15s;
+}
+
+.pin:active {
+  transform: scale(0.96);
 }
 
 .pin.strike {
@@ -213,6 +270,7 @@ body {
   border-radius: 12px;
   background: #334155;
   color: white;
+  font-size: 14px;
   font-weight: 800;
 }
 
@@ -226,6 +284,7 @@ body {
 
 .history h2 {
   font-size: 18px;
+  margin-bottom: 10px;
 }
 
 .empty,
@@ -237,45 +296,7 @@ body {
 }
 
 .record {
-  display: flex;
-  justify-content: space-between;
-  gap: 10px;
   margin-top: 8px;
-}
-
-.record p {
-  margin: 4px 0;
-  color: #cbd5e1;
-}
-
-.record small {
-  color: #94a3b8;
-}
-
-.record button {
-  border: none;
-  border-radius: 10px;
-  background: #7f1d1d;
-  color: white;
-  padding: 0 12px;
-}
-
-@media (max-width: 380px) {
-  .app {
-    padding: 8px;
-  }
-
-  .summaryBoard strong {
-    font-size: 26px;
-  }
-
-  .summaryBoard .smallScore {
-    font-size: 16px;
-  }
-
-  .pin {
-    height: 50px;
-  }
 }
 
 .recordMain {
@@ -288,39 +309,97 @@ body {
   align-items: center;
 }
 
+.recordTop strong {
+  font-size: 18px;
+  color: #38bdf8;
+}
+
+.recordTop button {
+  border: none;
+  border-radius: 10px;
+  background: #7f1d1d;
+  color: white;
+  padding: 6px 12px;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.record p {
+  margin: 6px 0 2px;
+  color: #cbd5e1;
+  font-size: 14px;
+}
+
+.record small {
+  color: #94a3b8;
+  font-size: 11px;
+}
+
 .recordFrames {
   display: grid;
-  grid-template-columns: repeat(10, minmax(38px, 1fr));
+  grid-template-columns: repeat(10, 58px);
   gap: 4px;
   margin-top: 10px;
   overflow-x: auto;
+  padding-bottom: 4px;
 }
 
 .recordFrame {
-  background: #020617;
-  border: 1px solid #334155;
+  min-width: 58px;
   border-radius: 8px;
-  text-align: center;
-  padding: 4px 2px;
-  min-width: 38px;
+  overflow: hidden;
+  border: 1px solid #334155;
+  background: #020617;
 }
 
 .recordFrame span {
-  display: block;
+  height: 18px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #1e293b;
   color: #94a3b8;
   font-size: 10px;
+  font-weight: 700;
 }
 
 .recordFrame b {
-  display: block;
+  height: 28px;
+  background: #0f172a;
   color: white;
-  font-size: 12px;
-  min-height: 16px;
+  font-size: 11px;
+  font-weight: 800;
 }
 
 .recordFrame em {
-  display: block;
+  height: 24px;
+  background: #020617;
   color: #38bdf8;
   font-size: 11px;
   font-style: normal;
+  font-weight: 700;
+}
+
+@media (max-width: 380px) {
+  .app {
+    padding: 8px;
+  }
+
+  .summaryBoard strong {
+    font-size: 24px;
+  }
+
+  .summaryBoard .smallScore {
+    font-size: 15px;
+  }
+
+  .pin {
+    height: 50px;
+    font-size: 20px;
+  }
+
+  .playerBar input {
+    font-size: 12px;
+    padding: 0 8px;
+  }
 }
