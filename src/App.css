@@ -112,25 +112,15 @@ body {
   color: #facc15;
 }
 
-.rollTrail {
-  margin-top: 10px;
-  min-height: 34px;
-  padding: 8px 10px;
-  border-radius: 12px;
-  background: #1e293b;
-  color: #cbd5e1;
-  font-size: 14px;
-  overflow-x: auto;
-  white-space: nowrap;
-}
-
 .laneScoreboard {
   display: grid;
-  grid-template-columns: repeat(10, minmax(42px, 1fr));
+  grid-template-columns: repeat(10, 58px);
   gap: 4px;
   margin-top: 10px;
   overflow-x: auto;
-  padding-bottom: 4px;
+  padding-bottom: 6px;
+  scroll-behavior: smooth;
+  -webkit-overflow-scrolling: touch;
 }
 
 .frameBox {

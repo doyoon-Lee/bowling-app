@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import "./App.css";
 
 let supabase = null;
@@ -159,10 +159,6 @@ function formatPinButton(pins, next) {
   return String(pins);
 }
 
-function formatRolls(rolls) {
-  return rolls.map((roll) => formatRollMark(roll)).join(" · ");
-}
-
 const keypadNumbers = [1, 2, 3, 4, 5, 6, 7, 8, 9, 0, 10];
 
 export default function App() {
@@ -172,10 +168,23 @@ export default function App() {
   const [records, setRecords] = useState([]);
   const [isRealtimeReady, setIsRealtimeReady] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
+  const scoreboardRef = useRef(null);
 
   const result = useMemo(() => calcBowlingScore(rolls), [rolls]);
   const maxPossible = useMemo(() => calcMaxPossibleScore(rolls), [rolls]);
   const next = getFrameRollLimit(rolls);
+
+  useEffect(() => {
+    if (!scoreboardRef.current || !next) return;
+
+    const targetFrameIndex = Math.max(0, next.frame - 1);
+    const frameWidth = scoreboardRef.current.scrollWidth / 10;
+
+    scoreboardRef.current.scrollTo({
+      left: Math.max(0, frameWidth * targetFrameIndex - frameWidth),
+      behavior: "smooth",
+    });
+  }, [rolls.length, next?.frame]);
 
   useEffect(() => {
     let channel;
@@ -303,10 +312,7 @@ export default function App() {
               <strong className="smallScore">{next ? `${next.frame}F ${next.rollInFrame}구` : "완료"}</strong>
             </div>
           </div>
-
-          <div className="rollTrail">{formatRolls(rolls) || "투구를 입력하세요"}</div>
-
-          <div className="laneScoreboard">
+          <div className="laneScoreboard" ref={scoreboardRef}>
             {Array.from({ length: 10 }, (_, i) => {
               const frame = result.frames[i];
               return (
