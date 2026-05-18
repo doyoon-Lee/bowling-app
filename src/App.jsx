@@ -28,9 +28,9 @@ function formatFrameMark(first, second, third, frame) {
 
   if (frame < 10) {
     if (first === 10) return "X";
-    if (second === undefined) return `${formatRollMark(first)}|`;
-    if (first + second === 10) return `${formatRollMark(first)}|/`;
-    return `${formatRollMark(first)}|${formatRollMark(second)}`;
+    if (second === undefined) return `${formatRollMark(first)} |`;
+    if (first + second === 10) return `${formatRollMark(first)} | /`;`;
+  return `${formatRollMark(first)} | ${formatRollMark(second)}`;)}`;
   }
 
   const firstMark = formatRollMark(first);
@@ -42,9 +42,7 @@ function formatFrameMark(first, second, third, frame) {
     else secondMark = formatRollMark(second);
   }
 
-  if (third !== undefined) thirdMark = formatRollMark(third);
-
-  return [firstMark, secondMark, thirdMark].filter(Boolean).join("|");
+  if (third !== undefined) thirdMark = formatRollMark(third);return [firstMark, secondMark, thirdMark].filter(Boolean).join(" | ");|");
 }
 
 function calcBowlingScore(rolls) {
