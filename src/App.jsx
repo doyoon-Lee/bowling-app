@@ -287,6 +287,8 @@ function getDayHigh(records) {
 }
 
 export default function App() {
+  const [session, setSession] = useState(null);
+  const [authLoading, setAuthLoading] = useState(true);
   const [playerName, setPlayerName] = useState("");
   const [place, setPlace] = useState("");
   const [rolls, setRolls] = useState([]);
@@ -295,6 +297,7 @@ export default function App() {
   const [isSaving, setIsSaving] = useState(false);
   const scoreboardRef = useRef(null);
 
+  const user = session?.user;
   const result = useMemo(() => calcBowlingScore(rolls), [rolls]);
   const maxPossible = useMemo(() => calcMaxPossibleScore(rolls), [rolls]);
   const groupedRecords = useMemo(() => groupRecordsByDate(records), [records]);
@@ -314,52 +317,116 @@ export default function App() {
   }, [rolls.length, next?.frame]);
 
   useEffect(() => {
+    let mounted = true;
+    let subscription;
+
+    async function initAuth() {
+      const client = await getSupabaseClient();
+      if (!client) {
+        setAuthLoading(false);
+        return;
+      }
+
+      const { data } = await client.auth.getSession();
+      if (!mounted) return;
+
+      setSession(data.session);
+      setAuthLoading(false);
+
+      const authListener = client.auth.onAuthStateChange((_event, nextSession) => {
+        setSession(nextSession);
+      });
+
+      subscription = authListener.data.subscription;
+    }
+
+    initAuth();
+
+    return () => {
+      mounted = false;
+      if (subscription) subscription.unsubscribe();
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!user) return;
+
+    const defaultName = user.user_metadata?.full_name || user.email?.split("@")[0] || "";
+    setPlayerName((prev) => prev || defaultName);
+  }, [user]);
+
+  useEffect(() => {
     let channel;
     let mounted = true;
 
-    async function init() {
+    async function loadRecords() {
       const client = await getSupabaseClient();
-      if (!client) {
+      if (!client || !user) {
+        setRecords([]);
         setIsRealtimeReady(false);
         return;
       }
 
-      const { data, error } = await client
-        .from("bowling_games")
-        .select("id, player_name, place, total, rolls, frames, created_at")
-        .order("created_at", { ascending: false })
-        .limit(50);
+      const fetchMyRecords = async () => {
+        const { data, error } = await client
+          .from("bowling_games")
+          .select("id, user_id, user_email, player_name, place, total, rolls, frames, created_at")
+          .eq("user_id", user.id)
+          .order("created_at", { ascending: false })
+          .limit(100);
 
-      if (!mounted) return;
-      if (!error && data) setRecords(data);
+        if (!error && data && mounted) setRecords(data);
+      };
+
+      await fetchMyRecords();
 
       channel = client
-        .channel("bowling-games-realtime")
+        .channel(`bowling-games-${user.id}`)
         .on(
           "postgres_changes",
-          { event: "*", schema: "public", table: "bowling_games" },
-          async () => {
-            const { data: latest } = await client
-              .from("bowling_games")
-              .select("id, player_name, place, total, rolls, frames, created_at")
-              .order("created_at", { ascending: false })
-              .limit(50);
-
-            if (latest) setRecords(latest);
-          }
+          { event: "*", schema: "public", table: "bowling_games", filter: `user_id=eq.${user.id}` },
+          fetchMyRecords
         )
         .subscribe((status) => {
-          setIsRealtimeReady(status === "SUBSCRIBED");
+          if (mounted) setIsRealtimeReady(status === "SUBSCRIBED");
         });
     }
 
-    init();
+    loadRecords();
 
     return () => {
       mounted = false;
       if (channel && supabase) supabase.removeChannel(channel);
     };
-  }, []);
+  }, [user]);
+
+  const signInWithGoogle = async () => {
+    const client = await getSupabaseClient();
+    if (!client) {
+      alert(".env 파일에 VITE_SUPABASE_URL, VITE_SUPABASE_ANON_KEY를 설정해야 합니다.");
+      return;
+    }
+
+    const { error } = await client.auth.signInWithOAuth({
+      provider: "google",
+      options: {
+        redirectTo: window.location.origin,
+      },
+    });
+
+    if (error) alert(`구글 로그인 실패: ${error.message}`);
+  };
+
+  const signOut = async () => {
+    const client = await getSupabaseClient();
+    if (!client) return;
+
+    await client.auth.signOut();
+    setRecords([]);
+    setRolls([]);
+    setPlayerName("");
+    setIsRealtimeReady(false);
+  };
 
   const addRoll = (pins) => {
     if (!next || pins > next.max) return;
@@ -386,6 +453,8 @@ export default function App() {
     setIsSaving(true);
 
     const payload = {
+      user_id: user.id,
+      user_email: user.email,
       player_name: playerName.trim(),
       place,
       total: result.total,
@@ -409,9 +478,35 @@ export default function App() {
     const client = await getSupabaseClient();
     if (!client) return;
 
-    const { error } = await client.from("bowling_games").delete().eq("id", id);
+    if (!user) return;
+
+    const { error } = await client.from("bowling_games").delete().eq("id", id).eq("user_id", user.id);
     if (error) alert(`삭제 실패: ${error.message}`);
   };
+
+  if (authLoading) {
+    return (
+      <main className="app">
+        <section className="container">
+          <div className="loginCard">로그인 상태를 확인하는 중입니다...</div>
+        </section>
+      </main>
+    );
+  }
+
+  if (!session) {
+    return (
+      <main className="app">
+        <section className="container">
+          <div className="loginCard">
+            <h1>🎳 Bowling Score</h1>
+            <p>구글 계정으로 로그인하고 개인 볼링 기록을 저장하세요.</p>
+            <button className="googleLoginButton" onClick={signInWithGoogle}>Google 계정으로 로그인</button>
+          </div>
+        </section>
+      </main>
+    );
+  }
 
   return (
     <main className="app">
@@ -419,9 +514,12 @@ export default function App() {
         <header className="header compactHeader">
           <div>
             <h1>🎳 Bowling Score</h1>
-            <p>실시간 모바일 점수판</p>
+            <p>{user?.email}</p>
           </div>
-          <div className={isRealtimeReady ? "status live" : "status off"}>{isRealtimeReady ? "LIVE" : "OFF"}</div>
+          <div className="headerActions">
+            <div className={isRealtimeReady ? "status live" : "status off"}>{isRealtimeReady ? "LIVE" : "OFF"}</div>
+            <button className="logoutButton" onClick={signOut}>로그아웃</button>
+          </div>
         </header>
 
         <section className="scoreboardCard">
