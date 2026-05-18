@@ -39,10 +39,11 @@ function calcBowlingScore(rolls) {
       }
 
       if (first === 10) {
-        const bonus1 = Number(rolls[rollIndex + 1] ?? 0);
-        const bonus2 = Number(rolls[rollIndex + 2] ?? 0);
-        score += 10 + bonus1 + bonus2;
-        frames.push({ frame, mark: "X", total: score });
+        const bonus1 = rolls[rollIndex + 1];
+        const bonus2 = rolls[rollIndex + 2];
+        const canCalculate = bonus1 !== undefined && bonus2 !== undefined;
+        if (canCalculate) score += 10 + bonus1 + bonus2;
+        frames.push({ frame, mark: "X", total: canCalculate ? score : "" });
         rollIndex += 1;
         continue;
       }
@@ -53,9 +54,10 @@ function calcBowlingScore(rolls) {
       }
 
       if (first + second === 10) {
-        const bonus = Number(rolls[rollIndex + 2] ?? 0);
-        score += 10 + bonus;
-        frames.push({ frame, mark: `${formatRollMark(first)}/`, total: score });
+        const bonus = rolls[rollIndex + 2];
+        const canCalculate = bonus !== undefined;
+        if (canCalculate) score += 10 + bonus;
+        frames.push({ frame, mark: `${formatRollMark(first)}/`, total: canCalculate ? score : "" });
       } else {
         score += first + second;
         frames.push({ frame, mark: `${formatRollMark(first)} ${formatRollMark(second)}`, total: score });
@@ -79,15 +81,32 @@ function calcBowlingScore(rolls) {
       else tenthMark += ` ${formatRollMark(b)}`;
     }
 
-    if (c !== undefined) {
-      tenthMark += ` ${formatRollMark(c)}`;
-    }
+    if (c !== undefined) tenthMark += ` ${formatRollMark(c)}`;
 
-    score += tenthRolls.reduce((sum, roll) => sum + Number(roll ?? 0), 0);
-    frames.push({ frame, mark: tenthMark, total: score });
+    const tenthComplete = tenthRolls.length === 3 || (tenthRolls.length === 2 && a !== 10 && a + b < 10);
+    if (tenthComplete) score += tenthRolls.reduce((sum, roll) => sum + Number(roll ?? 0), 0);
+
+    frames.push({ frame, mark: tenthMark, total: tenthComplete ? score : "" });
   }
 
-  return { total: score, frames };
+  const visibleTotal = [...frames].reverse().find((frame) => frame.total !== "")?.total || 0;
+  return { total: visibleTotal, frames };
+}
+
+function calcMaxPossibleScore(rolls) {
+  const next = getFrameRollLimit(rolls);
+  if (!next) return calcBowlingScore(rolls).total;
+
+  const simulated = [...rolls];
+  let guard = 0;
+
+  while (getFrameRollLimit(simulated) && guard < 25) {
+    const limit = getFrameRollLimit(simulated);
+    simulated.push(limit.max);
+    guard += 1;
+  }
+
+  return calcBowlingScore(simulated).total;
 }
 
 function getFrameRollLimit(rolls) {
@@ -154,6 +173,7 @@ export default function App() {
   const [isSaving, setIsSaving] = useState(false);
 
   const result = useMemo(() => calcBowlingScore(rolls), [rolls]);
+  const maxPossible = useMemo(() => calcMaxPossibleScore(rolls), [rolls]);
   const next = getFrameRollLimit(rolls);
 
   useEffect(() => {
@@ -254,42 +274,51 @@ export default function App() {
   return (
     <main className="app">
       <section className="container">
-        <header className="header">
+        <header className="header compactHeader">
           <div>
-            <h1>🎳 볼링 점수 기록</h1>
-            <p>같은 주소로 접속한 사용자에게 저장 기록이 실시간 반영됩니다.</p>
+            <h1>🎳 Bowling Score</h1>
+            <p>실시간 모바일 점수판</p>
           </div>
-          <div className={isRealtimeReady ? "status live" : "status off"}>
-            {isRealtimeReady ? "LIVE" : "OFF"}
-          </div>
+          <div className={isRealtimeReady ? "status live" : "status off"}>{isRealtimeReady ? "LIVE" : "OFF"}</div>
         </header>
 
-        <section className="card">
-          <div className="inputGrid">
+        <section className="scoreboardCard">
+          <div className="playerBar">
             <input value={playerName} onChange={(e) => setPlayerName(e.target.value)} placeholder="이름" />
             <input value={place} onChange={(e) => setPlace(e.target.value)} placeholder="볼링장" />
           </div>
 
-          <div className="scoreBox">
-            <span>현재 점수</span>
-            <strong>{result.total}</strong>
-            <small>{next ? `${next.frame}프레임 ${next.rollInFrame}구 입력 중` : "게임 입력 완료"}</small>
-            <em>{formatRolls(rolls)}</em>
+          <div className="summaryBoard">
+            <div>
+              <span>현재 점수</span>
+              <strong>{result.total}</strong>
+            </div>
+            <div>
+              <span>MAX</span>
+              <strong>{maxPossible}</strong>
+            </div>
+            <div>
+              <span>현재 입력</span>
+              <strong className="smallScore">{next ? `${next.frame}F ${next.rollInFrame}구` : "완료"}</strong>
+            </div>
           </div>
 
-          <div className="frames">
+          <div className="rollTrail">{formatRolls(rolls) || "투구를 입력하세요"}</div>
+
+          <div className="laneScoreboard">
             {Array.from({ length: 10 }, (_, i) => {
               const frame = result.frames[i];
               return (
-                <div className="frame" key={i}>
-                  <span>{i + 1}</span>
-                  <strong>{frame?.mark || ""}</strong>
-                  <small>{frame?.total || ""}</small>
+                <div className="frameBox" key={i}>
+                  <div className="frameNo">{i + 1}</div>
+                  <div className="frameMark">{frame?.mark || ""}</div>
+                  <div className="frameTotal">{frame?.total || ""}</div>
                 </div>
               );
             })}
           </div>
 
+          <div className="keypadTitle">핀 수 입력</div>
           <div className="pinGrid keypad">
             {keypadNumbers.map((pins) => (
               <button

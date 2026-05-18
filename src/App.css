@@ -1,300 +1,280 @@
-.counter {
-  font-size: 16px;
-  padding: 5px 10px;
-  border-radius: 5px;
-  color: var(--accent);
-  background: var(--accent-bg);
-  border: 2px solid transparent;
-  transition: border-color 0.3s;
-  margin-bottom: 24px;
-
-  &:hover {
-    border-color: var(--accent-border);
-  }
-  &:focus-visible {
-    outline: 2px solid var(--accent);
-    outline-offset: 2px;
-  }
+* {
+  box-sizing: border-box;
 }
 
-.hero {
-  position: relative;
-
-  .base,
-  .framework,
-  .vite {
-    inset-inline: 0;
-    margin: 0 auto;
-  }
-
-  .base {
-    width: 170px;
-    position: relative;
-    z-index: 0;
-  }
-
-  .framework,
-  .vite {
-    position: absolute;
-  }
-
-  .framework {
-    z-index: 1;
-    top: 34px;
-    height: 28px;
-    transform: perspective(2000px) rotateZ(300deg) rotateX(44deg) rotateY(39deg)
-      scale(1.4);
-  }
-
-  .vite {
-    z-index: 0;
-    top: 107px;
-    height: 26px;
-    width: auto;
-    transform: perspective(2000px) rotateZ(300deg) rotateX(40deg) rotateY(39deg)
-      scale(0.8);
-  }
+body {
+  margin: 0;
+  background: #0f172a;
+  font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
 }
 
-#center {
-  display: flex;
-  flex-direction: column;
-  gap: 25px;
-  place-content: center;
-  place-items: center;
-  flex-grow: 1;
-
-  @media (max-width: 1024px) {
-    padding: 32px 20px 24px;
-    gap: 18px;
-  }
+.app {
+  min-height: 100vh;
+  padding: 12px;
+  color: #e5e7eb;
 }
 
-#next-steps {
-  display: flex;
-  border-top: 1px solid var(--border);
-  text-align: left;
-
-  & > div {
-    flex: 1 1 0;
-    padding: 32px;
-    @media (max-width: 1024px) {
-      padding: 24px 20px;
-    }
-  }
-
-  .icon {
-    margin-bottom: 16px;
-    width: 22px;
-    height: 22px;
-  }
-
-  @media (max-width: 1024px) {
-    flex-direction: column;
-    text-align: center;
-  }
-}
-
-#docs {
-  border-right: 1px solid var(--border);
-
-  @media (max-width: 1024px) {
-    border-right: none;
-    border-bottom: 1px solid var(--border);
-  }
-}
-
-#next-steps ul {
-  list-style: none;
-  padding: 0;
-  display: flex;
-  gap: 8px;
-  margin: 32px 0 0;
-
-  .logo {
-    height: 18px;
-  }
-
-  a {
-    color: var(--text-h);
-    font-size: 16px;
-    border-radius: 6px;
-    background: var(--social-bg);
-    display: flex;
-    padding: 6px 12px;
-    align-items: center;
-    gap: 8px;
-    text-decoration: none;
-    transition: box-shadow 0.3s;
-
-    &:hover {
-      box-shadow: var(--shadow);
-    }
-    .button-icon {
-      height: 18px;
-      width: 18px;
-    }
-  }
-
-  @media (max-width: 1024px) {
-    margin-top: 20px;
-    flex-wrap: wrap;
-    justify-content: center;
-
-    li {
-      flex: 1 1 calc(50% - 8px);
-    }
-
-    a {
-      width: 100%;
-      justify-content: center;
-      box-sizing: border-box;
-    }
-  }
-}
-
-#spacer {
-  height: 88px;
-  border-top: 1px solid var(--border);
-  @media (max-width: 1024px) {
-    height: 48px;
-  }
-}
-
-.ticks {
-  position: relative;
+.container {
   width: 100%;
+  max-width: 520px;
+  margin: 0 auto;
+}
 
-  &::before,
-  &::after {
-    content: '';
-    position: absolute;
-    top: -4.5px;
-    border: 5px solid transparent;
-  }
+.compactHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 12px;
+}
 
-  &::before {
-    left: 0;
-    border-left-color: var(--border);
-  }
-  &::after {
-    right: 0;
-    border-right-color: var(--border);
-  }
+.compactHeader h1 {
+  margin: 0;
+  font-size: 22px;
+}
+
+.compactHeader p {
+  margin: 4px 0 0;
+  color: #94a3b8;
+  font-size: 13px;
+}
+
+.status {
+  padding: 6px 10px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.status.live {
+  background: #22c55e;
+  color: #052e16;
+}
+
+.status.off {
+  background: #475569;
+  color: white;
+}
+
+.scoreboardCard {
+  background: #111827;
+  border: 1px solid #334155;
+  border-radius: 20px;
+  padding: 12px;
+  overflow: hidden;
+}
+
+.playerBar {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+
+.playerBar input {
+  min-width: 0;
+  height: 44px;
+  border: 1px solid #334155;
+  border-radius: 12px;
+  background: #020617;
+  color: white;
+  padding: 0 12px;
+  font-size: 15px;
+}
+
+.summaryBoard {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1.2fr;
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.summaryBoard > div {
+  background: #020617;
+  border: 1px solid #334155;
+  border-radius: 14px;
+  padding: 10px;
+}
+
+.summaryBoard span {
+  display: block;
+  color: #94a3b8;
+  font-size: 12px;
+  margin-bottom: 4px;
+}
+
+.summaryBoard strong {
+  font-size: 32px;
+  line-height: 1;
+  color: #38bdf8;
+}
+
+.summaryBoard .smallScore {
+  font-size: 20px;
+  color: #facc15;
+}
+
+.rollTrail {
+  margin-top: 10px;
+  min-height: 34px;
+  padding: 8px 10px;
+  border-radius: 12px;
+  background: #1e293b;
+  color: #cbd5e1;
+  font-size: 14px;
+  overflow-x: auto;
+  white-space: nowrap;
+}
+
+.laneScoreboard {
+  display: grid;
+  grid-template-columns: repeat(10, minmax(42px, 1fr));
+  gap: 4px;
+  margin-top: 10px;
+  overflow-x: auto;
+  padding-bottom: 4px;
+}
+
+.frameBox {
+  min-width: 42px;
+  background: #0369a1;
+  border: 1px solid #7dd3fc;
+  text-align: center;
+}
+
+.frameNo {
+  background: #075985;
+  color: #a7f3d0;
+  font-size: 12px;
+  font-weight: 800;
+  padding: 2px 0;
+}
+
+.frameMark {
+  height: 30px;
+  background: #e0f2fe;
+  color: #0f172a;
+  font-size: 15px;
+  font-weight: 900;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.frameTotal {
+  height: 28px;
+  color: white;
+  font-size: 16px;
+  font-weight: 900;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.keypadTitle {
+  margin-top: 14px;
+  margin-bottom: 8px;
+  color: #cbd5e1;
+  font-weight: 800;
 }
 
 .pinGrid {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
-  gap: 12px;
-  margin-top: 16px;
+  gap: 8px;
 }
 
 .pin {
-  height: 64px;
+  height: 54px;
   border: none;
-  border-radius: 18px;
-  background: #ffffff;
-  font-size: 24px;
-  font-weight: 700;
-  box-shadow: 0 2px 10px rgba(0,0,0,0.08);
-  transition: 0.15s;
+  border-radius: 14px;
+  background: #e5e7eb;
+  color: #0f172a;
+  font-size: 22px;
+  font-weight: 900;
 }
 
-.pin:active {
-  transform: scale(0.96);
+.pin.strike {
+  background: #facc15;
+  color: #111827;
 }
 
 .pin:disabled {
   opacity: 0.25;
 }
 
-.pin.strike {
-  background: #111111;
-  color: white;
-}
-
 .buttonGrid {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
-  gap: 10px;
-  margin-top: 20px;
+  gap: 8px;
+  margin-top: 10px;
 }
 
 .buttonGrid button {
-  height: 48px;
+  height: 46px;
   border: none;
-  border-radius: 14px;
-  font-weight: 600;
-  background: #ececec;
+  border-radius: 12px;
+  background: #334155;
+  color: white;
+  font-weight: 800;
 }
 
 .buttonGrid .primary {
-  background: #111111;
-  color: white;
-}
-
-.frames {
-  display: grid;
-  grid-template-columns: repeat(5, 1fr);
-  gap: 8px;
-  margin-top: 16px;
-}
-
-.frame {
-  background: white;
-  border-radius: 14px;
-  padding: 10px;
-  text-align: center;
-  box-shadow: 0 1px 6px rgba(0,0,0,0.05);
-}
-
-.scoreBox {
-  margin-top: 14px;
-  background: #111111;
-  color: white;
-  border-radius: 22px;
-  padding: 22px;
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-}
-
-.scoreBox strong {
-  font-size: 52px;
-  line-height: 1;
-}
-
-.inputGrid {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 10px;
-}
-
-.inputGrid input {
-  height: 46px;
-  border-radius: 12px;
-  border: 1px solid #ddd;
-  padding: 0 14px;
-  font-size: 15px;
-}
-
-.card {
-  background: #f7f7f7;
-  border-radius: 24px;
-  padding: 18px;
+  background: #2563eb;
 }
 
 .history {
-  margin-top: 24px;
+  margin-top: 16px;
+}
+
+.history h2 {
+  font-size: 18px;
+}
+
+.empty,
+.record {
+  background: #111827;
+  border: 1px solid #334155;
+  border-radius: 14px;
+  padding: 12px;
 }
 
 .record {
-  background: white;
-  border-radius: 16px;
-  padding: 14px;
-  margin-top: 10px;
   display: flex;
   justify-content: space-between;
-  align-items: center;
+  gap: 10px;
+  margin-top: 8px;
+}
+
+.record p {
+  margin: 4px 0;
+  color: #cbd5e1;
+}
+
+.record small {
+  color: #94a3b8;
+}
+
+.record button {
+  border: none;
+  border-radius: 10px;
+  background: #7f1d1d;
+  color: white;
+  padding: 0 12px;
+}
+
+@media (max-width: 380px) {
+  .app {
+    padding: 8px;
+  }
+
+  .summaryBoard strong {
+    font-size: 26px;
+  }
+
+  .summaryBoard .smallScore {
+    font-size: 16px;
+  }
+
+  .pin {
+    height: 50px;
+  }
 }
