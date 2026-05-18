@@ -620,7 +620,12 @@ export default function App() {
 
           <div className="keypadTitle">핀 수 입력</div>
           <div className="pinGrid keypad">
-            {keypadNumbers.map((pins) => (
+          {keypadNumbers
+            .filter((pins) => {
+              if (pins !== 10) return true;
+              return next?.canStrike;
+            })
+            .map((pins) => (
               <button
                 key={pins}
                 disabled={!next || pins > next.max || (pins === 10 && !next.canStrike)}
@@ -630,7 +635,7 @@ export default function App() {
                 {formatPinButton(pins, next, rolls)}
               </button>
             ))}
-          </div>
+        </div>
 
           <div className="buttonGrid">
             <button onClick={undo} disabled={rolls.length === 0}>되돌리기</button>
