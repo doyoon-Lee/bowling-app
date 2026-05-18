@@ -627,7 +627,19 @@ export default function App() {
           {keypadNumbers
             .filter((pins) => {
               if (pins !== 10) return true;
-              return next?.canStrike;
+
+              // 초구 스트라이크 가능
+              if (next?.canStrike) return true;
+
+              // 초구 거터 후 스페어 가능
+              if (next?.rollInFrame === 2) {
+                const currentFrameStart = getCurrentFrameStartIndex(rolls, next.frame);
+                const firstRoll = rolls[currentFrameStart];
+
+                if (firstRoll === 0) return true;
+              }
+
+              return false;
             })
             .map((pins) => (
               <button
