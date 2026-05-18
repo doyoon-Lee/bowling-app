@@ -496,3 +496,11 @@ body {
     padding: 0 8px;
   }
 }
+
+.loginNotice {
+  display: block;
+  margin-top: 8px;
+  color: #64748b;
+  font-size: 12px;
+  text-align: center;
+}

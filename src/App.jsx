@@ -400,22 +400,49 @@ export default function App() {
     };
   }, [user]);
 
-  const signInWithGoogle = async () => {
-    const client = await getSupabaseClient();
-    if (!client) {
-      alert(".env 파일에 VITE_SUPABASE_URL, VITE_SUPABASE_ANON_KEY를 설정해야 합니다.");
-      return;
+const signInWithGoogle = async () => {
+  const client = await getSupabaseClient();
+
+  if (!client) {
+    alert(".env 파일 확인");
+    return;
+  }
+
+  const ua = navigator.userAgent.toLowerCase();
+
+  const isInAppBrowser =
+    ua.includes("naver") ||
+    ua.includes("kakaotalk") ||
+    ua.includes("instagram") ||
+    ua.includes("fbav");
+
+  const currentUrl = window.location.origin;
+
+  if (isInAppBrowser) {
+    const externalUrl = `googlechrome://${window.location.host}`;
+
+    alert("네이버/카카오 앱에서는 로그인 제한이 있어 Chrome으로 이동합니다.");
+
+    if (/android/i.test(ua)) {
+      window.location.href = externalUrl;
+    } else {
+      window.location.href = currentUrl;
     }
 
-    const { error } = await client.auth.signInWithOAuth({
-      provider: "google",
-      options: {
-        redirectTo: window.location.origin,
-      },
-    });
+    return;
+  }
 
-    if (error) alert(`구글 로그인 실패: ${error.message}`);
-  };
+  const { error } = await client.auth.signInWithOAuth({
+    provider: "google",
+    options: {
+      redirectTo: currentUrl,
+    },
+  });
+
+  if (error) {
+    alert(`구글 로그인 실패: ${error.message}`);
+  }
+};
 
   const signOut = async () => {
     const client = await getSupabaseClient();
@@ -501,6 +528,9 @@ export default function App() {
           <div className="loginCard">
             <h1>🎳 Bowling Score</h1>
             <p>구글 계정으로 로그인하고 개인 볼링 기록을 저장하세요.</p>
+            <small className="loginNotice">
+            네이버/카카오 앱에서는 Chrome으로 열어주세요.
+          </small>
             <button className="googleLoginButton" onClick={signInWithGoogle}>Google 계정으로 로그인</button>
           </div>
         </section>
