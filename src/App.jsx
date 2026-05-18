@@ -29,8 +29,8 @@ function formatFrameMark(first, second, third, frame) {
   if (frame < 10) {
     if (first === 10) return "X";
     if (second === undefined) return `${formatRollMark(first)} |`;
-    if (first + second === 10) return `${formatRollMark(first)} | /`;`;
-  return `${formatRollMark(first)} | ${formatRollMark(second)}`;)}`;
+    if (first + second === 10) return `${formatRollMark(first)} | /`;
+    return `${formatRollMark(first)} | ${formatRollMark(second)}`;
   }
 
   const firstMark = formatRollMark(first);
@@ -42,7 +42,9 @@ function formatFrameMark(first, second, third, frame) {
     else secondMark = formatRollMark(second);
   }
 
-  if (third !== undefined) thirdMark = formatRollMark(third);return [firstMark, secondMark, thirdMark].filter(Boolean).join(" | ");|");
+  if (third !== undefined) thirdMark = formatRollMark(third);
+
+  return [firstMark, secondMark, thirdMark].filter(Boolean).join(" | ");
 }
 
 function calcBowlingScore(rolls) {
@@ -199,6 +201,17 @@ function formatPinButton(pins, next, rolls) {
 }
 
 const keypadNumbers = [1, 2, 3, 4, 5, 6, 7, 8, 9, 0, 10];
+
+function renderFrameMark(mark) {
+  if (!mark) return null;
+
+  return mark.split("|").map((part, index, array) => (
+    <React.Fragment key={`${part}-${index}`}>
+      <span className="markPart">{part.trim()}</span>
+      {index < array.length - 1 && <span className="markDivider">|</span>}
+    </React.Fragment>
+  ));
+}
 
 export default function App() {
   const [playerName, setPlayerName] = useState("");
@@ -362,7 +375,7 @@ export default function App() {
               return (
                 <div className="frameBox" key={i}>
                   <div className="frameNo">{i + 1}</div>
-                  <div className="frameMark">{frame?.mark || ""}</div>
+                  <div className="frameMark">{renderFrameMark(frame?.mark)}</div>
                   <div className="frameTotal">{frame?.total || ""}</div>
                 </div>
               );
@@ -412,7 +425,7 @@ export default function App() {
                     {(record.frames || []).map((frame) => (
                       <div className="recordFrame" key={frame.frame}>
                         <span>{frame.frame}</span>
-                        <b>{frame.mark || ""}</b>
+                        <b>{renderFrameMark(frame.mark)}</b>
                         <em>{frame.total || ""}</em>
                       </div>
                     ))}

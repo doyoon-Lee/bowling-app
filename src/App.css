@@ -138,15 +138,24 @@ body {
   padding: 2px 0;
 }
 
-.frameMark {
-  height: 30px;
-  background: #e0f2fe;
-  color: #0f172a;
-  font-size: 15px;
-  font-weight: 900;
+.frameMark,
+.recordFrame b {
   display: flex;
   align-items: center;
   justify-content: center;
+  gap: 6px;
+  white-space: nowrap;
+}
+
+.markPart {
+  display: inline-block;
+  min-width: 12px;
+  text-align: center;
+}
+
+.markDivider {
+  color: #64748b;
+  font-weight: 700;
 }
 
 .frameTotal {
