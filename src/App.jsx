@@ -23,6 +23,30 @@ function formatRollMark(value) {
   return String(value);
 }
 
+function formatFrameMark(first, second, third, frame) {
+  if (first === undefined) return "";
+
+  if (frame < 10) {
+    if (first === 10) return "X";
+    if (second === undefined) return `${formatRollMark(first)}|`;
+    if (first + second === 10) return `${formatRollMark(first)}|/`;
+    return `${formatRollMark(first)}|${formatRollMark(second)}`;
+  }
+
+  const firstMark = formatRollMark(first);
+  let secondMark = "";
+  let thirdMark = "";
+
+  if (second !== undefined) {
+    if (first !== 10 && first + second === 10) secondMark = "/";
+    else secondMark = formatRollMark(second);
+  }
+
+  if (third !== undefined) thirdMark = formatRollMark(third);
+
+  return [firstMark, secondMark, thirdMark].filter(Boolean).join("|");
+}
+
 function calcBowlingScore(rolls) {
   let score = 0;
   let rollIndex = 0;
@@ -49,7 +73,7 @@ function calcBowlingScore(rolls) {
       }
 
       if (second === undefined) {
-        frames.push({ frame, mark: formatRollMark(first), total: "" });
+        frames.push({ frame, mark: formatFrameMark(first, undefined, undefined, frame), total: "" });
         rollIndex += 2;
         continue;
       }
@@ -58,10 +82,10 @@ function calcBowlingScore(rolls) {
         const bonus = rolls[rollIndex + 2];
         const canCalculate = bonus !== undefined;
         if (canCalculate) score += 10 + bonus;
-        frames.push({ frame, mark: `${formatRollMark(first)}/`, total: canCalculate ? score : "" });
+        frames.push({ frame, mark: formatFrameMark(first, second, undefined, frame), total: canCalculate ? score : "" });
       } else {
         score += first + second;
-        frames.push({ frame, mark: `${formatRollMark(first)} ${formatRollMark(second)}`, total: score });
+        frames.push({ frame, mark: formatFrameMark(first, second, undefined, frame), total: score });
       }
 
       rollIndex += 2;
@@ -75,14 +99,7 @@ function calcBowlingScore(rolls) {
     }
 
     const [a, b, c] = tenthRolls;
-    let tenthMark = formatRollMark(a);
-
-    if (b !== undefined) {
-      if (a !== 10 && a + b === 10) tenthMark += " /";
-      else tenthMark += ` ${formatRollMark(b)}`;
-    }
-
-    if (c !== undefined) tenthMark += ` ${formatRollMark(c)}`;
+    const tenthMark = formatFrameMark(a, b, c, frame);
 
     const tenthComplete = tenthRolls.length === 3 || (tenthRolls.length === 2 && a !== 10 && a + b < 10);
     if (tenthComplete) score += tenthRolls.reduce((sum, roll) => sum + Number(roll ?? 0), 0);
@@ -380,12 +397,24 @@ export default function App() {
           ) : (
             records.map((record) => (
               <article className="record" key={record.id}>
-                <div>
-                  <strong>{record.total}점</strong>
+                <div className="recordMain">
+                  <div className="recordTop">
+                    <strong>{record.total}점</strong>
+                    <button onClick={() => deleteRecord(record.id)}>삭제</button>
+                  </div>
                   <p>{record.player_name} · {record.place || "장소 미입력"}</p>
                   <small>{new Date(record.created_at).toLocaleString()}</small>
+
+                  <div className="recordFrames">
+                    {(record.frames || []).map((frame) => (
+                      <div className="recordFrame" key={frame.frame}>
+                        <span>{frame.frame}</span>
+                        <b>{frame.mark || ""}</b>
+                        <em>{frame.total || ""}</em>
+                      </div>
+                    ))}
+                  </div>
                 </div>
-                <button onClick={() => deleteRecord(record.id)}>삭제</button>
               </article>
             ))
           )}

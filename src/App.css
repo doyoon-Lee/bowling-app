@@ -268,3 +268,50 @@ body {
     height: 50px;
   }
 }
+
+.recordMain {
+  width: 100%;
+}
+
+.recordTop {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.recordFrames {
+  display: grid;
+  grid-template-columns: repeat(10, minmax(38px, 1fr));
+  gap: 4px;
+  margin-top: 10px;
+  overflow-x: auto;
+}
+
+.recordFrame {
+  background: #020617;
+  border: 1px solid #334155;
+  border-radius: 8px;
+  text-align: center;
+  padding: 4px 2px;
+  min-width: 38px;
+}
+
+.recordFrame span {
+  display: block;
+  color: #94a3b8;
+  font-size: 10px;
+}
+
+.recordFrame b {
+  display: block;
+  color: white;
+  font-size: 12px;
+  min-height: 16px;
+}
+
+.recordFrame em {
+  display: block;
+  color: #38bdf8;
+  font-size: 11px;
+  font-style: normal;
+}
