@@ -50,6 +50,7 @@ function calcBowlingScore(rolls) {
 
       if (second === undefined) {
         frames.push({ frame, mark: formatRollMark(first), total: "" });
+        rollIndex += 2;
         continue;
       }
 
