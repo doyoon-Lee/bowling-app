@@ -425,8 +425,8 @@ export default function App() {
     };
   }, [user]);
 
-  const signInWithGoogle = async () => {
-    if (isInAppBrowser()) {
+  const signInWithProvider = async (provider) => {
+    if (isInAppBrowser() && provider === "google") {
       alert("네이버/카카오 앱 내부 브라우저에서는 Google 로그인이 차단될 수 있습니다. Chrome으로 이동합니다.");
       openCurrentPageInExternalBrowser();
       return;
@@ -439,14 +439,17 @@ export default function App() {
     }
 
     const { error } = await client.auth.signInWithOAuth({
-      provider: "google",
+      provider,
       options: {
         redirectTo: window.location.origin,
       },
     });
 
-    if (error) alert(`구글 로그인 실패: ${error.message}`);
+    if (error) alert(`로그인 실패: ${error.message}`);
   };
+
+  const signInWithGoogle = () => signInWithProvider("google");
+  const signInWithKakao = () => signInWithProvider("kakao");
 
   const signOut = async () => {
     const client = await getSupabaseClient();
@@ -545,18 +548,23 @@ export default function App() {
         <section className="container">
           <div className="loginCard">
             <h1>🎳 Bowling Score</h1>
-            <p>구글 계정으로 로그인하고 개인 볼링 기록을 저장하세요.</p>
+            <p>Google 또는 Kakao 계정으로 로그인하고 개인 볼링 기록을 저장하세요.</p>
 
             {inAppBrowser && (
               <div className="browserNotice">
                 <strong>외부 브라우저가 필요합니다.</strong>
-                <span>네이버/카카오 앱 내부 브라우저에서는 Google 로그인이 차단될 수 있습니다.</span>
+                <span>네이버/카카오 앱 내부 브라우저에서는 Google 로그인이 차단될 수 있습니다. Kakao 로그인 또는 Chrome 열기를 사용하세요.</span>
               </div>
             )}
 
-            <button className="googleLoginButton" onClick={signInWithGoogle}>
-              {inAppBrowser ? "Chrome으로 열기" : "Google 계정으로 로그인"}
-            </button>
+            <div className="loginButtonGroup">
+              <button className="googleLoginButton" onClick={signInWithGoogle}>
+                {inAppBrowser ? "Chrome으로 열기" : "Google 계정으로 로그인"}
+              </button>
+              <button className="kakaoLoginButton" onClick={signInWithKakao}>
+                Kakao 계정으로 로그인
+              </button>
+            </div>
           </div>
         </section>
       </main>
@@ -612,12 +620,7 @@ export default function App() {
 
           <div className="keypadTitle">핀 수 입력</div>
           <div className="pinGrid keypad">
-            {keypadNumbers
-            .filter((pins) => {
-              if (pins !== 10) return true;
-              return next?.canStrike;
-            })
-            .map((pins) => (
+            {keypadNumbers.map((pins) => (
               <button
                 key={pins}
                 disabled={!next || pins > next.max || (pins === 10 && !next.canStrike)}
