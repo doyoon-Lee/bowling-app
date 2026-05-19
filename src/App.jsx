@@ -678,10 +678,25 @@ export default function App() {
 
             <div className="loginButtonGroup">
               <button className="googleLoginButton" onClick={signInWithGoogle}>
-                {inAppBrowser ? "Chrome으로 열기" : "Google 계정으로 로그인"}
+                <span className="loginButtonInner">
+                  <img
+                    src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg"
+                    alt="Google"
+                  />
+                  <span>
+                    {inAppBrowser ? "Chrome으로 열기" : "Google 계정으로 로그인"}
+                  </span>
+                </span>
               </button>
+
               <button className="kakaoLoginButton" onClick={signInWithKakao}>
-                Kakao 계정으로 로그인
+                <span className="loginButtonInner">
+                  <img
+                    src="https://upload.wikimedia.org/wikipedia/commons/e/e3/KakaoTalk_logo.svg"
+                    alt="Kakao"
+                  />
+                  <span>Kakao 계정으로 로그인</span>
+                </span>
               </button>
             </div>
           </div>

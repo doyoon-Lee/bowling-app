@@ -643,3 +643,16 @@ input {
   height: 42px;
   margin-top: 12px;
 }
+
+.loginButtonInner {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+}
+
+.loginButtonInner img {
+  width: 20px;
+  height: 20px;
+  object-fit: contain;
+}
