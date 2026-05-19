@@ -322,6 +322,10 @@ export default function App() {
   const [authLoading, setAuthLoading] = useState(true);
   const [playerName, setPlayerName] = useState("");
   const [place, setPlace] = useState("");
+  const [placeCandidates, setPlaceCandidates] = useState([]);
+  const [isPlaceModalOpen, setIsPlaceModalOpen] = useState(false);
+  const [isSearchingPlace, setIsSearchingPlace] = useState(false);
+  const [placeSearchMessage, setPlaceSearchMessage] = useState("");
   const [rolls, setRolls] = useState([]);
   const [records, setRecords] = useState([]);
   const [isSaving, setIsSaving] = useState(false);
@@ -471,6 +475,72 @@ export default function App() {
     setPlayerName("");
   };
 
+  const searchNearbyBowlingPlaces = () => {
+    setIsPlaceModalOpen(true);
+    setPlaceCandidates([]);
+    setPlaceSearchMessage("");
+
+    if (!navigator.geolocation) {
+      setPlaceSearchMessage("이 브라우저에서는 위치 기능을 사용할 수 없습니다.");
+      return;
+    }
+
+    if (!window.kakao?.maps?.services) {
+      setPlaceSearchMessage("Kakao Maps SDK가 로드되지 않았습니다. index.html 설정을 확인해주세요.");
+      return;
+    }
+
+    setIsSearchingPlace(true);
+
+    navigator.geolocation.getCurrentPosition(
+      (position) => {
+        const { latitude, longitude } = position.coords;
+        const places = new window.kakao.maps.services.Places();
+        const location = new window.kakao.maps.LatLng(latitude, longitude);
+
+        places.keywordSearch(
+          "볼링장",
+          (data, status) => {
+            setIsSearchingPlace(false);
+
+            if (status !== window.kakao.maps.services.Status.OK || !data?.length) {
+              setPlaceSearchMessage("주변 볼링장을 찾지 못했습니다. 직접 입력해주세요.");
+              return;
+            }
+
+            const candidates = data.slice(0, 3).map((item) => ({
+              id: item.id,
+              name: item.place_name,
+              address: item.road_address_name || item.address_name,
+              distance: item.distance ? `${Number(item.distance).toLocaleString()}m` : "거리 정보 없음",
+            }));
+
+            setPlaceCandidates(candidates);
+          },
+          {
+            location,
+            radius: 10000,
+            sort: window.kakao.maps.services.SortBy.DISTANCE,
+          }
+        );
+      },
+      () => {
+        setIsSearchingPlace(false);
+        setPlaceSearchMessage("위치 권한이 필요합니다. 위치 허용 후 다시 눌러주세요.");
+      },
+      {
+        enableHighAccuracy: true,
+        timeout: 8000,
+        maximumAge: 60000,
+      }
+    );
+  };
+
+  const selectBowlingPlace = (candidate) => {
+    setPlace(candidate.name);
+    setIsPlaceModalOpen(false);
+  };
+
   const addRoll = (pins) => {
     if (!next || pins > next.max) return;
     setRolls((prev) => [...prev, pins]);
@@ -616,7 +686,12 @@ export default function App() {
         <section className="scoreboardCard">
           <div className="playerBar">
             <input value={playerName} onChange={(e) => setPlayerName(e.target.value)} placeholder="이름을 적어주세요" />
-            <input value={place} onChange={(e) => setPlace(e.target.value)} placeholder="볼링장 이름을 기입해주세요" />
+            <input
+              value={place}
+              onChange={(e) => setPlace(e.target.value)}
+              onClick={searchNearbyBowlingPlaces}
+              placeholder="볼링장 이름을 기입해주세요"
+            />
           </div>
 
           <div className="summaryBoard">
@@ -690,6 +765,42 @@ export default function App() {
             </button>
           </div>
         </section>
+
+        {isPlaceModalOpen && (
+          <div className="placeModalBackdrop" onClick={() => setIsPlaceModalOpen(false)}>
+            <div className="placeModal" onClick={(e) => e.stopPropagation()}>
+              <div className="placeModalHeader">
+                <div>
+                  <strong>주변 볼링장</strong>
+                  <span>현재 위치 기준 최대 3개</span>
+                </div>
+                <button onClick={() => setIsPlaceModalOpen(false)}>닫기</button>
+              </div>
+
+              {isSearchingPlace && <div className="placeLoading">주변 볼링장을 검색 중입니다...</div>}
+
+              {!isSearchingPlace && placeSearchMessage && (
+                <div className="placeMessage">{placeSearchMessage}</div>
+              )}
+
+              {!isSearchingPlace && placeCandidates.length > 0 && (
+                <div className="placeList">
+                  {placeCandidates.map((candidate) => (
+                    <button key={candidate.id} onClick={() => selectBowlingPlace(candidate)}>
+                      <strong>{candidate.name}</strong>
+                      <span>{candidate.distance}</span>
+                      <em>{candidate.address}</em>
+                    </button>
+                  ))}
+                </div>
+              )}
+
+              <button className="manualPlaceButton" onClick={() => setIsPlaceModalOpen(false)}>
+                직접 입력하기
+              </button>
+            </div>
+          </div>
+        )}
 
         <section className="history">
           <h2>날짜별 기록</h2>
