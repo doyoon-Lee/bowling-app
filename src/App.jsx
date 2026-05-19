@@ -198,6 +198,12 @@ function formatPinButton(pins, next, rolls) {
 
   if (pins === 10 && next.canStrike) return "X";
 
+  if (pins === 10 && next.rollInFrame === 2) {
+    const currentFrameStart = getCurrentFrameStartIndex(rolls, next.frame);
+    const firstRoll = rolls[currentFrameStart];
+    if (firstRoll === 0) return "/";
+  }
+
   if (next.rollInFrame === 2) {
     const currentFrameStart = getCurrentFrameStartIndex(rolls, next.frame);
     const firstRoll = rolls[currentFrameStart];
@@ -496,7 +502,11 @@ export default function App() {
 
     const payload = {
       user_id: user.id,
-      user_email: user.email,
+      user_email:
+        user.email ||
+        user.user_metadata?.email ||
+        user.user_metadata?.kakao_account?.email ||
+        `${user.id}@kakao.local`,
       player_name: playerName.trim(),
       place,
       total: result.total,
@@ -644,16 +654,38 @@ export default function App() {
 
           <div className="keypadTitle">핀 수 입력</div>
           <div className="pinGrid keypad">
-            {keypadNumbers.map((pins) => (
-              <button
-                key={pins}
-                disabled={!next || pins > next.max || (pins === 10 && !next.canStrike)}
-                onClick={() => addRoll(pins)}
-                className={pins === 10 && next?.canStrike ? "pin strike" : "pin"}
-              >
-                {formatPinButton(pins, next, rolls)}
-              </button>
-            ))}
+            {keypadNumbers
+              .filter((pins) => {
+                if (pins !== 10) return true;
+
+                if (next?.canStrike) return true;
+
+                if (next?.rollInFrame === 2) {
+                  const currentFrameStart = getCurrentFrameStartIndex(rolls, next.frame);
+                  const firstRoll = rolls[currentFrameStart];
+                  return firstRoll === 0;
+                }
+
+                return false;
+              })
+              .map((pins) => {
+                const isGutterSpareButton = (() => {
+                  if (!next || pins !== 10 || next.rollInFrame !== 2) return false;
+                  const currentFrameStart = getCurrentFrameStartIndex(rolls, next.frame);
+                  return rolls[currentFrameStart] === 0;
+                })();
+
+                return (
+                  <button
+                    key={pins}
+                    disabled={!next || pins > next.max || (pins === 10 && !next.canStrike && !isGutterSpareButton)}
+                    onClick={() => addRoll(pins)}
+                    className={pins === 10 && (next?.canStrike || isGutterSpareButton) ? "pin strike" : "pin"}
+                  >
+                    {formatPinButton(pins, next, rolls)}
+                  </button>
+                );
+              })}
           </div>
 
           <div className="buttonGrid">
