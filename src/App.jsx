@@ -485,55 +485,63 @@ export default function App() {
       return;
     }
 
-    if (!window.kakao?.maps?.services) {
-      setPlaceSearchMessage("Kakao Maps SDK가 로드되지 않았습니다. index.html 설정을 확인해주세요.");
+    if (!window.kakao || !window.kakao.maps) {
+      setPlaceSearchMessage("Kakao Maps SDK가 로드되지 않았습니다. index.html의 JavaScript 키와 SDK 주소를 확인해주세요.");
       return;
     }
 
     setIsSearchingPlace(true);
 
-    navigator.geolocation.getCurrentPosition(
-      (position) => {
-        const { latitude, longitude } = position.coords;
-        const places = new window.kakao.maps.services.Places();
-        const location = new window.kakao.maps.LatLng(latitude, longitude);
-
-        places.keywordSearch(
-          "볼링장",
-          (data, status) => {
-            setIsSearchingPlace(false);
-
-            if (status !== window.kakao.maps.services.Status.OK || !data?.length) {
-              setPlaceSearchMessage("주변 볼링장을 찾지 못했습니다. 직접 입력해주세요.");
-              return;
-            }
-
-            const candidates = data.slice(0, 3).map((item) => ({
-              id: item.id,
-              name: item.place_name,
-              address: item.road_address_name || item.address_name,
-              distance: item.distance ? `${Number(item.distance).toLocaleString()}m` : "거리 정보 없음",
-            }));
-
-            setPlaceCandidates(candidates);
-          },
-          {
-            location,
-            radius: 10000,
-            sort: window.kakao.maps.services.SortBy.DISTANCE,
-          }
-        );
-      },
-      () => {
+    window.kakao.maps.load(() => {
+      if (!window.kakao.maps.services) {
         setIsSearchingPlace(false);
-        setPlaceSearchMessage("위치 권한이 필요합니다. 위치 허용 후 다시 눌러주세요.");
-      },
-      {
-        enableHighAccuracy: true,
-        timeout: 8000,
-        maximumAge: 60000,
+        setPlaceSearchMessage("Kakao Maps services 라이브러리를 찾지 못했습니다. SDK 주소에 libraries=services가 포함되어 있는지 확인해주세요.");
+        return;
       }
-    );
+
+      navigator.geolocation.getCurrentPosition(
+        (position) => {
+          const { latitude, longitude } = position.coords;
+          const places = new window.kakao.maps.services.Places();
+          const location = new window.kakao.maps.LatLng(latitude, longitude);
+
+          places.keywordSearch(
+            "볼링장",
+            (data, status) => {
+              setIsSearchingPlace(false);
+
+              if (status !== window.kakao.maps.services.Status.OK || !data?.length) {
+                setPlaceSearchMessage("주변 볼링장을 찾지 못했습니다. 직접 입력해주세요.");
+                return;
+              }
+
+              const candidates = data.slice(0, 3).map((item) => ({
+                id: item.id,
+                name: item.place_name,
+                address: item.road_address_name || item.address_name,
+                distance: item.distance ? `${Number(item.distance).toLocaleString()}m` : "거리 정보 없음",
+              }));
+
+              setPlaceCandidates(candidates);
+            },
+            {
+              location,
+              radius: 10000,
+              sort: window.kakao.maps.services.SortBy.DISTANCE,
+            }
+          );
+        },
+        () => {
+          setIsSearchingPlace(false);
+          setPlaceSearchMessage("위치 권한이 필요합니다. 위치 허용 후 다시 눌러주세요.");
+        },
+        {
+          enableHighAccuracy: true,
+          timeout: 8000,
+          maximumAge: 60000,
+        }
+      );
+    });
   };
 
   const selectBowlingPlace = (candidate) => {
