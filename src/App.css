@@ -11,22 +11,28 @@ body,
   font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
 }
 
+body {
+  color: #0f172a;
+}
+
 button,
 input {
   font-family: inherit;
 }
 
-body {
-  color: #0f172a;
+.app {
+  min-height: 100vh;
+  padding: 12px;
+  display: flex;
+  justify-content: center;
 }
 
-
+.app > .container {
+  width: 100%;
+}
 
 .authPage {
-  min-height: 100vh;
-  display: flex;
   align-items: center;
-  justify-content: center;
   padding: 24px 14px;
 }
 
@@ -34,6 +40,13 @@ body {
   width: 100%;
   max-width: 420px;
   margin: 0 auto;
+}
+
+.container {
+  width: 100%;
+  max-width: 520px;
+  margin: 0 auto;
+  flex: 1;
 }
 
 .loginCard {
@@ -154,12 +167,6 @@ body {
   line-height: 1.4;
 }
 
-.container {
-  width: 100%;
-  max-width: 760px;
-  margin: 0 auto;
-}
-
 .compactHeader {
   display: flex;
   justify-content: space-between;
@@ -186,23 +193,6 @@ body {
   align-items: center;
   gap: 6px;
   flex-shrink: 0;
-}
-
-.status {
-  padding: 6px 10px;
-  border-radius: 999px;
-  font-size: 12px;
-  font-weight: 800;
-}
-
-.status.live {
-  background: #22c55e;
-  color: #052e16;
-}
-
-.status.off {
-  background: #94a3b8;
-  color: white;
 }
 
 .logoutButton {
@@ -656,27 +646,5 @@ body {
   .playerBar input {
     font-size: 12px;
     padding: 0 8px;
-  }
-}
-
-@media (min-width: 1024px) {
-  .container {
-    max-width: 860px;
-  }
-
-  .scoreboardCard,
-  .dateGroup,
-  .empty {
-    border-radius: 28px;
-  }
-
-  .laneScoreboard {
-    justify-content: center;
-    overflow-x: visible;
-  }
-
-  .recordFrames {
-    justify-content: center;
-    overflow-x: visible;
   }
 }
