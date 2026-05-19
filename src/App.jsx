@@ -199,19 +199,16 @@ function formatPinButton(pins, next, rolls) {
   if (pins === 10 && next.canStrike) return "X";
 
   if (next.rollInFrame === 2) {
-  const currentFrameStart = getCurrentFrameStartIndex(rolls, next.frame);
-  const firstRoll = rolls[currentFrameStart];
+    const currentFrameStart = getCurrentFrameStartIndex(rolls, next.frame);
+    const firstRoll = rolls[currentFrameStart];
 
-  if (firstRoll !== undefined) {
-    const spareValue = 10 - firstRoll;
+    if (firstRoll !== undefined) {
+      const spareValue = 10 - firstRoll;
 
-    // 스페어 우선 처리
-    if (pins === spareValue) return "/";
-
-    // 초구가 거터가 아닐 때만 후구 거터 표시
-    if (pins === 0 && firstRoll !== 0) return "-";
+      if (pins === spareValue) return "/";
+      if (pins === 0) return "-";
+    }
   }
-}
 
   if (next.frame === 10 && next.rollInFrame === 3) {
     const currentFrameStart = getCurrentFrameStartIndex(rolls, 10);
@@ -535,9 +532,13 @@ export default function App() {
 
   if (authLoading) {
     return (
-      <main className="app">
-        <section className="container">
-          <div className="loginCard">로그인 상태를 확인하는 중입니다...</div>
+      <main className="app authPage">
+        <section className="authContainer">
+          <div className="loginCard loadingCard">
+            <div className="logoBadge">🎳</div>
+            <h1>Bowling Score</h1>
+            <p>로그인 상태를 확인하는 중입니다...</p>
+          </div>
         </section>
       </main>
     );
@@ -547,11 +548,23 @@ export default function App() {
     const inAppBrowser = isInAppBrowser();
 
     return (
-      <main className="app">
-        <section className="container">
+      <main className="app authPage">
+        <section className="authContainer">
           <div className="loginCard">
-            <h1>🎳 Bowling Score</h1>
-            <p>Google 또는 Kakao 계정으로 로그인하고 개인 볼링 기록을 저장하세요.</p>
+            <div className="logoBadge">🎳</div>
+            <h1>Bowling Score</h1>
+            <p className="loginSubtitle">개인 볼링 기록을 날짜별로 저장하고 점수 변화를 확인하세요.</p>
+
+            <div className="loginFeatureGrid">
+              <div>
+                <strong>개인 기록</strong>
+                <span>계정별 점수 저장</span>
+              </div>
+              <div>
+                <strong>날짜별 관리</strong>
+                <span>일자별 평균/최고점</span>
+              </div>
+            </div>
 
             {inAppBrowser && (
               <div className="browserNotice">
@@ -583,9 +596,8 @@ export default function App() {
             <p>{user?.email}</p>
           </div>
           <div className="headerActions">
-            <button className="logoutButton" onClick={signOut}>
-              로그아웃
-            </button>
+            <div className={isRealtimeReady ? "status live" : "status off"}>{isRealtimeReady ? "LIVE" : "OFF"}</div>
+            <button className="logoutButton" onClick={signOut}>로그아웃</button>
           </div>
         </header>
 
@@ -624,48 +636,17 @@ export default function App() {
 
           <div className="keypadTitle">핀 수 입력</div>
           <div className="pinGrid keypad">
-          {keypadNumbers
-            .filter((pins) => {
-              if (pins !== 10) return true;
-
-              // 초구 스트라이크 가능
-              if (next?.canStrike) return true;
-
-              // 초구 거터 후 스페어 가능
-              if (next?.rollInFrame === 2) {
-                const currentFrameStart = getCurrentFrameStartIndex(rolls, next.frame);
-                const firstRoll = rolls[currentFrameStart];
-
-                if (firstRoll === 0) return true;
-              }
-
-              return false;
-            })
-            .map((pins) => (
+            {keypadNumbers.map((pins) => (
               <button
                 key={pins}
-                disabled={
-                !next ||
-                pins > next.max ||
-                (
-                  pins === 10 &&
-                  !next.canStrike &&
-                  !(
-                    next.rollInFrame === 2 &&
-                    (() => {
-                      const currentFrameStart = getCurrentFrameStartIndex(rolls, next.frame);
-                      return rolls[currentFrameStart] === 0;
-                    })()
-                  )
-                )
-              }
+                disabled={!next || pins > next.max || (pins === 10 && !next.canStrike)}
                 onClick={() => addRoll(pins)}
                 className={pins === 10 && next?.canStrike ? "pin strike" : "pin"}
               >
                 {formatPinButton(pins, next, rolls)}
               </button>
             ))}
-        </div>
+          </div>
 
           <div className="buttonGrid">
             <button onClick={undo} disabled={rolls.length === 0}>되돌리기</button>
