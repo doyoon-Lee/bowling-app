@@ -324,7 +324,6 @@ export default function App() {
   const [place, setPlace] = useState("");
   const [rolls, setRolls] = useState([]);
   const [records, setRecords] = useState([]);
-  const [isRealtimeReady, setIsRealtimeReady] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const scoreboardRef = useRef(null);
 
@@ -394,7 +393,6 @@ export default function App() {
       const client = await getSupabaseClient();
       if (!client || !user) {
         setRecords([]);
-        setIsRealtimeReady(false);
         return;
       }
 
@@ -418,9 +416,7 @@ export default function App() {
           { event: "*", schema: "public", table: "bowling_games", filter: `user_id=eq.${user.id}` },
           fetchMyRecords
         )
-        .subscribe((status) => {
-          if (mounted) setIsRealtimeReady(status === "SUBSCRIBED");
-        });
+.subscribe();
     }
 
     loadRecords();
@@ -473,7 +469,6 @@ export default function App() {
     setRecords([]);
     setRolls([]);
     setPlayerName("");
-    setIsRealtimeReady(false);
   };
 
   const addRoll = (pins) => {
@@ -614,7 +609,6 @@ export default function App() {
             <p>{user?.email}</p>
           </div>
           <div className="headerActions">
-            <div className={isRealtimeReady ? "status live" : "status off"}>{isRealtimeReady ? "LIVE" : "OFF"}</div>
             <button className="logoutButton" onClick={signOut}>로그아웃</button>
           </div>
         </header>
