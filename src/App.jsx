@@ -438,11 +438,19 @@ export default function App() {
       return;
     }
 
+    const oauthOptions = {
+      redirectTo: window.location.origin,
+    };
+
+    if (provider === "kakao") {
+      oauthOptions.queryParams = {
+        prompt: "login",
+      };
+    }
+
     const { error } = await client.auth.signInWithOAuth({
       provider,
-      options: {
-        redirectTo: window.location.origin,
-      },
+      options: oauthOptions,
     });
 
     if (error) alert(`로그인 실패: ${error.message}`);
