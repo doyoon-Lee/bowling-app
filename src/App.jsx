@@ -414,13 +414,18 @@ export default function App() {
       await fetchMyRecords();
 
       channel = client
-        .channel(`bowling-games-${user.id}`)
-        .on(
-          "postgres_changes",
-          { event: "*", schema: "public", table: "bowling_games", filter: `user_id=eq.${user.id}` },
-          fetchMyRecords
-        )
-.subscribe();
+  .channel(`bowling-games-${user.id}`)
+  .on(
+    "postgres_changes",
+    {
+      event: "*",
+      schema: "public",
+      table: "bowling_games",
+      filter: `user_id=eq.${user.id}`,
+    },
+    fetchMyRecords
+  )
+  .subscribe();
     }
 
     loadRecords();
@@ -684,7 +689,13 @@ export default function App() {
         <header className="header compactHeader">
           <div>
             <h1>🎳 Bowling Score</h1>
-            <p>{user?.email}</p>
+            <p>
+              {user?.email ||
+                user?.user_metadata?.email ||
+                user?.user_metadata?.full_name ||
+                user?.user_metadata?.name ||
+                "로그인 사용자"}
+            </p>
           </div>
           <div className="headerActions">
             <button className="logoutButton" onClick={signOut}>로그아웃</button>
