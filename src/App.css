@@ -29,6 +29,7 @@ input {
 
 .app > .container {
   width: 100%;
+  max-width: 520px;
 }
 
 .authPage {
@@ -45,8 +46,9 @@ input {
 .container {
   width: 100%;
   max-width: 520px;
-  margin: 0 auto;
-  flex: 1;
+  margin-left: auto;
+  margin-right: auto;
+  flex: none;
 }
 
 .loginCard {
