@@ -414,18 +414,13 @@ export default function App() {
       await fetchMyRecords();
 
       channel = client
-  .channel(`bowling-games-${user.id}`)
-  .on(
-    "postgres_changes",
-    {
-      event: "*",
-      schema: "public",
-      table: "bowling_games",
-      filter: `user_id=eq.${user.id}`,
-    },
-    fetchMyRecords
-  )
-  .subscribe();
+        .channel(`bowling-games-${user.id}`)
+        .on(
+          "postgres_changes",
+          { event: "*", schema: "public", table: "bowling_games", filter: `user_id=eq.${user.id}` },
+          fetchMyRecords
+        )
+.subscribe();
     }
 
     loadRecords();
@@ -617,13 +612,25 @@ export default function App() {
   };
 
   const deleteRecord = async (id) => {
+    if (!window.confirm("이 기록을 삭제할까요?")) return;
+
     const client = await getSupabaseClient();
     if (!client) return;
 
     if (!user) return;
 
-    const { error } = await client.from("bowling_games").delete().eq("id", id).eq("user_id", user.id);
-    if (error) alert(`삭제 실패: ${error.message}`);
+    const { error } = await client
+      .from("bowling_games")
+      .delete()
+      .eq("id", id)
+      .eq("user_id", user.id);
+
+    if (error) {
+      alert(`삭제 실패: ${error.message}`);
+      return;
+    }
+
+    setRecords((prev) => prev.filter((record) => record.id !== id));
   };
 
   if (authLoading) {
@@ -689,13 +696,7 @@ export default function App() {
         <header className="header compactHeader">
           <div>
             <h1>🎳 Bowling Score</h1>
-            <p>
-              {user?.email ||
-                user?.user_metadata?.email ||
-                user?.user_metadata?.full_name ||
-                user?.user_metadata?.name ||
-                "로그인 사용자"}
-            </p>
+            <p>{user?.email}</p>
           </div>
           <div className="headerActions">
             <button className="logoutButton" onClick={signOut}>로그아웃</button>
@@ -853,7 +854,16 @@ export default function App() {
                       </summary>
 
                       <div className="recordDetail">
-                        <button onClick={() => deleteRecord(record.id)}>삭제</button>
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.preventDefault();
+                            e.stopPropagation();
+                            deleteRecord(record.id);
+                          }}
+                        >
+                          삭제
+                        </button>
                         <div className="recordFrames">
                           {(record.frames || []).map((frame) => (
                             <div className="recordFrame" key={frame.frame}>
