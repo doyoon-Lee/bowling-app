@@ -694,3 +694,71 @@ input {
   font-size: 12px;
   line-height: 1.5;
 }
+
+.geminiPreviewTable {
+  display: grid;
+  gap: 4px;
+  margin-top: 10px;
+  border: 1px solid #dbeafe;
+  border-radius: 14px;
+  overflow: hidden;
+}
+
+.geminiPreviewHead,
+.geminiPreviewRow {
+  display: grid;
+  grid-template-columns: 42px 1fr 1.4fr;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 10px;
+}
+
+.geminiPreviewHead {
+  background: #eff6ff;
+  color: #0369a1;
+  font-size: 12px;
+  font-weight: 900;
+}
+
+.geminiPreviewRow {
+  background: white;
+  border-top: 1px solid #eef2ff;
+}
+
+.geminiPreviewRow span {
+  color: #64748b;
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.geminiPreviewRow strong {
+  color: #0f172a;
+  font-size: 13px;
+}
+
+.geminiPreviewRow em {
+  color: #0284c7;
+  font-size: 12px;
+  font-style: normal;
+  font-weight: 800;
+}
+
+.geminiPreviewSummary {
+  margin-top: 10px;
+  padding: 10px;
+  border-radius: 12px;
+  background: #f8fafc;
+}
+
+.geminiPreviewSummary span {
+  display: block;
+  color: #64748b;
+  font-size: 11px;
+  margin-bottom: 4px;
+}
+
+.geminiPreviewSummary b {
+  color: #0f172a;
+  font-size: 13px;
+  word-break: break-all;
+}

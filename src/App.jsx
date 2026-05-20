@@ -321,6 +321,48 @@ function openCurrentPageInExternalBrowser() {
   window.location.href = currentUrl;
 }
 
+function normalizeGeminiRollsFromFrames(frames, fallbackRolls = []) {
+  if (!Array.isArray(frames) || frames.length === 0) return fallbackRolls;
+
+  const rebuilt = [];
+
+  frames
+    .slice()
+    .sort((a, b) => Number(a.frame || 0) - Number(b.frame || 0))
+    .forEach((frame) => {
+      if (!Array.isArray(frame.rolls)) return;
+
+      frame.rolls.forEach((roll) => {
+        const value = Number(roll);
+        if (Number.isInteger(value) && value >= 0 && value <= 10) {
+          rebuilt.push(value);
+        }
+      });
+    });
+
+  return rebuilt.length > 0 ? rebuilt.slice(0, 21) : fallbackRolls;
+}
+
+function repairTenthFrameRolls(rolls, frames = []) {
+  const repaired = [...rolls];
+  const tenthStart = getCurrentFrameStartIndex(repaired, 10);
+  const tenthRolls = repaired.slice(tenthStart);
+  const tenthFrame = Array.isArray(frames)
+    ? frames.find((frame) => Number(frame.frame) === 10)
+    : null;
+  const tenthMark = String(tenthFrame?.mark || "").toUpperCase();
+
+  if (tenthRolls.length === 2 && tenthRolls[0] === 10) {
+    const xCount = (tenthMark.match(/X/g) || []).length;
+
+    if (xCount >= 3) {
+      repaired.push(10);
+    }
+  }
+
+  return repaired.slice(0, 21);
+}
+
 export default function App() {
   const [session, setSession] = useState(null);
   const [authLoading, setAuthLoading] = useState(true);
@@ -336,6 +378,7 @@ export default function App() {
   const [cameraMessage, setCameraMessage] = useState("");
   const [ocrPreviewRolls, setOcrPreviewRolls] = useState([]);
   const [ocrRawText, setOcrRawText] = useState("");
+  const [geminiPreviewFrames, setGeminiPreviewFrames] = useState([]);
   const [rolls, setRolls] = useState([]);
   const [records, setRecords] = useState([]);
   const [isSaving, setIsSaving] = useState(false);
@@ -574,6 +617,8 @@ export default function App() {
     setCameraMessage("");
     setOcrPreviewRolls([]);
     setOcrRawText("");
+    setGeminiPreviewFrames([]);
+    setGeminiPreviewFrames([]);
     setIsCameraModalOpen(true);
   };
 
@@ -637,7 +682,14 @@ export default function App() {
         return;
       }
 
-      setOcrPreviewRolls(data.rolls);
+      const frameBasedRolls = normalizeGeminiRollsFromFrames(data.frames, data.rolls);
+      const repairedRolls = repairTenthFrameRolls(frameBasedRolls, data.frames);
+      const previewFrames = Array.isArray(data.frames) && data.frames.length > 0
+        ? data.frames
+        : calcBowlingScore(repairedRolls).frames;
+
+      setOcrPreviewRolls(repairedRolls);
+      setGeminiPreviewFrames(previewFrames);
       setOcrRawText(data.notes || `confidence: ${data.confidence ?? "정보 없음"}`);
       setCameraMessage("Gemini 분석 결과를 확인한 뒤 맞으면 적용해주세요.");
     } catch (error) {
@@ -932,7 +984,28 @@ export default function App() {
               {ocrPreviewRolls.length > 0 && (
                 <div className="ocrPreviewBox">
                   <strong>Gemini 분석 투구값</strong>
-                  <p>{ocrPreviewRolls.map((roll) => formatRollMark(roll)).join(" · ")}</p>
+                  <div className="geminiPreviewTable">
+                    <div className="geminiPreviewHead">
+                      <span>F</span>
+                      <span>표기</span>
+                      <span>투구값</span>
+                    </div>
+                    {(geminiPreviewFrames.length > 0 ? geminiPreviewFrames : calcBowlingScore(ocrPreviewRolls).frames).map((frame) => (
+                      <div className="geminiPreviewRow" key={frame.frame}>
+                        <span>{frame.frame}</span>
+                        <strong>{frame.mark || "-"}</strong>
+                        <em>
+                          {Array.isArray(frame.rolls)
+                            ? frame.rolls.map((roll) => formatRollMark(roll)).join(" · ")
+                            : "-"}
+                        </em>
+                      </div>
+                    ))}
+                  </div>
+                  <div className="geminiPreviewSummary">
+                    <span>전체 투구값</span>
+                    <b>{ocrPreviewRolls.map((roll) => formatRollMark(roll)).join(" · ")}</b>
+                  </div>
                   <small>분석 메모: {ocrRawText || "없음"}</small>
                 </div>
               )}
