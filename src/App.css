@@ -34,26 +34,35 @@ input {
   padding: 24px 14px;
 }
 
-.authContainer {
-  width: 100%;
-  max-width: 420px;
-  margin: 0 auto;
-}
-
+.authContainer,
 .container {
   width: 100%;
-  max-width: 520px;
   margin-left: auto;
   margin-right: auto;
 }
 
-.loginCard {
-  width: 100%;
+.authContainer {
+  max-width: 420px;
+}
+
+.container {
+  max-width: 520px;
+}
+
+.loginCard,
+.scoreboardCard,
+.dateGroup,
+.empty {
   background: white;
   border: 1px solid #dbeafe;
+  border-radius: 22px;
+  padding: 12px;
+  box-shadow: 0 8px 30px rgba(15, 23, 42, 0.06);
+}
+
+.loginCard {
   border-radius: 28px;
   padding: 28px 22px;
-  box-shadow: 0 18px 50px rgba(15, 23, 42, 0.1);
   text-align: center;
 }
 
@@ -71,7 +80,6 @@ input {
 
 .loginCard h1 {
   margin: 0;
-  color: #0f172a;
   font-size: 28px;
 }
 
@@ -137,6 +145,56 @@ input {
   color: #191919;
 }
 
+.loginButtonInner {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+}
+
+.loginButtonInner img {
+  width: 20px;
+  height: 20px;
+}
+
+.kakaoLogoText {
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background: #191919;
+  color: #fee500;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 13px;
+  font-weight: 900;
+}
+
+.browserNotice {
+  margin: 14px 0;
+  padding: 12px;
+  border-radius: 16px;
+  background: #fff7ed;
+  border: 1px solid #fed7aa;
+  text-align: left;
+}
+
+.browserNotice strong,
+.browserNotice span {
+  color: #9a3412;
+  display: block;
+}
+
+.browserNotice strong {
+  font-size: 14px;
+  margin-bottom: 4px;
+}
+
+.browserNotice span {
+  font-size: 12px;
+  line-height: 1.4;
+}
+
 .compactHeader {
   display: flex;
   justify-content: space-between;
@@ -168,16 +226,6 @@ input {
   font-weight: 800;
 }
 
-.scoreboardCard,
-.dateGroup,
-.empty {
-  background: white;
-  border: 1px solid #dbeafe;
-  border-radius: 22px;
-  padding: 12px;
-  box-shadow: 0 8px 30px rgba(15, 23, 42, 0.06);
-}
-
 .playerBar {
   display: grid;
   grid-template-columns: 1fr 1fr;
@@ -193,6 +241,10 @@ input {
   color: #0f172a;
   padding: 0 12px;
   font-size: 14px;
+}
+
+.playerBar input::placeholder {
+  color: #94a3b8;
 }
 
 .summaryBoard {
@@ -302,6 +354,10 @@ input {
   min-width: 12px;
 }
 
+.markPart.single {
+  min-width: auto;
+}
+
 .markDivider {
   color: #64748b;
   font-weight: 800;
@@ -311,19 +367,40 @@ input {
   visibility: hidden;
 }
 
-.keypadTitle {
+.scoreInputHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
   margin-top: 14px;
-  margin-bottom: 8px;
+}
+
+.keypadTitle {
   color: #334155;
   font-size: 14px;
   font-weight: 800;
-  text-align: center;
+}
+
+.cameraButton {
+  cursor: pointer;
+  border: none;
+  border-radius: 999px;
+  background: #e0f2fe;
+  color: #0369a1;
+  padding: 8px 12px;
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.cameraButton input {
+  display: none;
 }
 
 .pinGrid {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
   gap: 8px;
+  margin-top: 8px;
 }
 
 .pin {
@@ -369,6 +446,198 @@ input {
   color: white;
 }
 
+.placeModalBackdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(15, 23, 42, 0.45);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 18px;
+  z-index: 999;
+}
+
+.placeModal {
+  width: 100%;
+  max-width: 420px;
+  max-height: 92vh;
+  overflow-y: auto;
+  background: white;
+  border-radius: 24px;
+  padding: 18px;
+  box-shadow: 0 20px 60px rgba(15, 23, 42, 0.25);
+}
+
+.placeModalHeader {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 14px;
+}
+
+.placeModalHeader strong {
+  display: block;
+  font-size: 18px;
+}
+
+.placeModalHeader span {
+  display: block;
+  margin-top: 3px;
+  color: #64748b;
+  font-size: 12px;
+}
+
+.placeModalHeader button,
+.manualPlaceButton {
+  border: none;
+  border-radius: 12px;
+  background: #e2e8f0;
+  color: #0f172a;
+  font-weight: 800;
+  padding: 8px 12px;
+}
+
+.manualPlaceButton {
+  width: 100%;
+  height: 44px;
+  margin-top: 12px;
+}
+
+.primaryModalButton {
+  background: #2563eb;
+  color: white;
+}
+
+.placeLoading,
+.placeMessage {
+  padding: 14px;
+  text-align: center;
+  color: #64748b;
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+.placeList {
+  display: grid;
+  gap: 8px;
+}
+
+.placeList button {
+  width: 100%;
+  border: 1px solid #dbeafe;
+  border-radius: 16px;
+  background: #f8fafc;
+  padding: 12px;
+  text-align: left;
+}
+
+.placeList strong {
+  display: block;
+  color: #0284c7;
+  font-size: 15px;
+}
+
+.placeList span {
+  display: block;
+  margin-top: 4px;
+  color: #ca8a04;
+  font-size: 13px;
+  font-weight: 800;
+}
+
+.placeList em {
+  display: block;
+  margin-top: 4px;
+  color: #64748b;
+  font-size: 12px;
+  font-style: normal;
+}
+
+.scoreImagePreview {
+  width: 100%;
+  max-height: 320px;
+  object-fit: contain;
+  border-radius: 16px;
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+}
+
+.cameraGuide {
+  margin: 10px 0 0;
+  color: #64748b;
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.ocrPreviewBox {
+  margin: 12px 0;
+  padding: 12px;
+  border-radius: 16px;
+  background: #f8fafc;
+  border: 1px solid #dbeafe;
+}
+
+.ocrPreviewBox > strong {
+  display: block;
+  color: #0284c7;
+  font-size: 14px;
+  margin-bottom: 8px;
+}
+
+.ocrPreviewBox small {
+  display: block;
+  margin-top: 8px;
+  color: #64748b;
+  font-size: 11px;
+  word-break: break-word;
+  line-height: 1.4;
+}
+
+.geminiScoreboardPreview {
+  display: flex;
+  overflow-x: auto;
+  gap: 5px;
+  padding-bottom: 6px;
+  -webkit-overflow-scrolling: touch;
+}
+
+.geminiScoreFrame {
+  min-width: 58px;
+  border-radius: 10px;
+  overflow: hidden;
+  border: 1px solid #7dd3fc;
+  background: #0284c7;
+  flex-shrink: 0;
+}
+
+.geminiScoreFrame:nth-child(10) {
+  min-width: 82px;
+}
+
+.geminiScoreFrameNo {
+  height: 22px;
+  background: #0369a1;
+  color: #d1fae5;
+  font-size: 11px;
+  font-weight: 800;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.geminiScoreFrameMark {
+  height: 38px;
+  background: white;
+  color: #0f172a;
+  font-size: 13px;
+  font-weight: 900;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  white-space: nowrap;
+}
+
 .history {
   margin-top: 16px;
 }
@@ -379,8 +648,13 @@ input {
   text-align: center;
 }
 
+.empty {
+  color: #64748b;
+}
+
 .dateGroup {
   margin-top: 12px;
+  border-radius: 18px;
 }
 
 .dateHeader {
@@ -479,8 +753,6 @@ input {
 .recordFrame {
   background: white;
   border: 1px solid #e2e8f0;
-  border-radius: 10px;
-  overflow: hidden;
 }
 
 .recordFrame span {
@@ -494,6 +766,7 @@ input {
   font-weight: 700;
   border-bottom: 1px solid #f1f5f9;
 }
+
 .recordFrame b {
   height: 28px;
   font-size: 11px;
@@ -543,261 +816,4 @@ input {
     font-size: 12px;
     padding: 0 8px;
   }
-}
-
-.placeModalBackdrop {
-  position: fixed;
-  inset: 0;
-  background: rgba(15, 23, 42, 0.45);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 18px;
-  z-index: 999;
-}
-
-.placeModal {
-  width: 100%;
-  max-width: 420px;
-  background: white;
-  border-radius: 24px;
-  padding: 18px;
-  box-shadow: 0 20px 60px rgba(15, 23, 42, 0.25);
-}
-
-.placeModalHeader {
-  display: flex;
-  justify-content: space-between;
-  gap: 10px;
-  margin-bottom: 14px;
-}
-
-.placeModalHeader strong {
-  display: block;
-  font-size: 18px;
-}
-
-.placeModalHeader span {
-  display: block;
-  margin-top: 3px;
-  color: #64748b;
-  font-size: 12px;
-}
-
-.placeModalHeader button,
-.manualPlaceButton {
-  border: none;
-  border-radius: 12px;
-  background: #e2e8f0;
-  color: #0f172a;
-  font-weight: 800;
-  padding: 8px 12px;
-}
-
-.placeLoading,
-.placeMessage {
-  padding: 18px;
-  text-align: center;
-  color: #64748b;
-  font-size: 14px;
-}
-
-.placeList {
-  display: grid;
-  gap: 8px;
-}
-
-.placeList button {
-  width: 100%;
-  border: 1px solid #dbeafe;
-  border-radius: 16px;
-  background: #f8fafc;
-  padding: 12px;
-  text-align: left;
-}
-
-.placeList strong {
-  display: block;
-  color: #0284c7;
-  font-size: 15px;
-}
-
-.placeList span {
-  display: block;
-  margin-top: 4px;
-  color: #ca8a04;
-  font-size: 13px;
-  font-weight: 800;
-}
-
-.placeList em {
-  display: block;
-  margin-top: 4px;
-  color: #64748b;
-  font-size: 12px;
-  font-style: normal;
-}
-
-.manualPlaceButton {
-  width: 100%;
-  height: 42px;
-  margin-top: 12px;
-}
-
-.loginButtonInner {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 10px;
-}
-
-.loginButtonInner img {
-  width: 20px;
-  height: 20px;
-  object-fit: contain;
-}
-
-.scoreInputHeader {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 8px;
-}
-
-.cameraButton {
-  cursor: pointer;
-  border: none;
-  border-radius: 999px;
-  background: #e0f2fe;
-  color: #0369a1;
-  padding: 8px 12px;
-  font-size: 12px;
-  font-weight: 800;
-}
-
-.cameraButton input {
-  display: none;
-}
-
-.scoreImagePreview {
-  width: 100%;
-  max-height: 320px;
-  object-fit: contain;
-  border-radius: 16px;
-  background: #f8fafc;
-  border: 1px solid #e2e8f0;
-}
-
-.cameraGuide {
-  margin: 10px 0 0;
-  color: #64748b;
-  font-size: 12px;
-  line-height: 1.5;
-}
-
-.geminiPreviewTable {
-  display: grid;
-  gap: 4px;
-  margin-top: 10px;
-  border: 1px solid #dbeafe;
-  border-radius: 14px;
-  overflow: hidden;
-}
-
-.geminiPreviewHead,
-.geminiPreviewRow {
-  display: grid;
-  grid-template-columns: 42px 1fr 1.4fr;
-  align-items: center;
-  gap: 6px;
-  padding: 8px 10px;
-}
-
-.geminiPreviewHead {
-  background: #eff6ff;
-  color: #0369a1;
-  font-size: 12px;
-  font-weight: 900;
-}
-
-.geminiPreviewRow {
-  background: white;
-  border-top: 1px solid #eef2ff;
-}
-
-.geminiPreviewRow span {
-  color: #64748b;
-  font-size: 12px;
-  font-weight: 800;
-}
-
-.geminiPreviewRow strong {
-  color: #0f172a;
-  font-size: 13px;
-}
-
-.geminiPreviewRow em {
-  color: #0284c7;
-  font-size: 12px;
-  font-style: normal;
-  font-weight: 800;
-}
-
-.geminiPreviewSummary {
-  margin-top: 10px;
-  padding: 10px;
-  border-radius: 12px;
-  background: #f8fafc;
-}
-
-.geminiPreviewSummary span {
-  display: block;
-  color: #64748b;
-  font-size: 11px;
-  margin-bottom: 4px;
-}
-
-.geminiPreviewSummary b {
-  color: #0f172a;
-  font-size: 13px;
-  word-break: break-all;
-}
-
-.geminiScoreboardPreview {
-  display: flex;
-  overflow-x: auto;
-  gap: 6px;
-  margin-top: 12px;
-  padding-bottom: 4px;
-}
-
-.geminiScoreFrame {
-  min-width: 62px;
-  border-radius: 12px;
-  overflow: hidden;
-  border: 1px solid #bfdbfe;
-  background: white;
-  flex-shrink: 0;
-}
-
-.geminiScoreFrameNo {
-  background: #0284c7;
-  color: white;
-  text-align: center;
-  font-size: 11px;
-  font-weight: 800;
-  padding: 4px 0;
-}
-
-.geminiScoreFrameMark {
-  min-height: 44px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 3px;
-  padding: 8px 6px;
-  font-size: 14px;
-  font-weight: 800;
-  color: #0f172a;
-  background: #f8fafc;
 }
