@@ -592,9 +592,11 @@ export default function App() {
       return;
     }
 
-    const client = await getSupabaseClient();
-    if (!client) {
-      setCameraMessage("Supabase 연결 정보가 필요합니다.");
+    const url = import.meta.env.VITE_SUPABASE_URL;
+    const anonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
+
+    if (!url || !anonKey) {
+      setCameraMessage("Supabase URL 또는 ANON KEY가 설정되지 않았습니다.");
       return;
     }
 
@@ -605,15 +607,32 @@ export default function App() {
       const formData = new FormData();
       formData.append("image", scoreImage);
 
-      const { data, error } = await client.functions.invoke("parse-bowling-score", {
+      const response = await fetch(`${url}/functions/v1/parse-bowling-score`, {
+        method: "POST",
+        headers: {
+          apikey: anonKey,
+          Authorization: `Bearer ${session?.access_token || anonKey}`,
+        },
         body: formData,
       });
 
-      console.log("Edge Function Response:", data);
-      console.log("Edge Function Error:", error);
+      const responseText = await response.text();
+      console.log("Edge Function HTTP Status:", response.status);
+      console.log("Edge Function Raw Response:", responseText);
 
-      if (error) {
-        setCameraMessage(`사진 분석 오류: ${error.message || "Edge Function 호출 실패"}`);
+      let data = null;
+
+      try {
+        data = responseText ? JSON.parse(responseText) : null;
+      } catch {
+        setCameraMessage(`사진 분석 응답 파싱 실패: ${responseText}`);
+        return;
+      }
+
+      if (!response.ok) {
+        setCameraMessage(
+          `사진 분석 오류 (${response.status}): ${data?.error || "알 수 없는 오류"}${data?.detail ? ` / ${data.detail}` : ""}`
+        );
         return;
       }
 
@@ -623,12 +642,14 @@ export default function App() {
       }
 
       if (!Array.isArray(data.rolls)) {
-        setCameraMessage("rolls 데이터 형식이 올바르지 않습니다.");
+        setCameraMessage(`rolls 데이터 형식이 올바르지 않습니다: ${JSON.stringify(data)}`);
         return;
       }
 
       if (data.rolls.length === 0) {
-        setCameraMessage("점수판을 인식하지 못했습니다. 사진을 더 정면에서 다시 찍어주세요.");
+        setCameraMessage(
+          data.notes || "점수판을 인식하지 못했습니다. 사진을 더 정면에서 다시 찍어주세요."
+        );
         return;
       }
 
