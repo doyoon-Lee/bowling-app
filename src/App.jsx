@@ -326,6 +326,10 @@ export default function App() {
   const [isPlaceModalOpen, setIsPlaceModalOpen] = useState(false);
   const [isSearchingPlace, setIsSearchingPlace] = useState(false);
   const [placeSearchMessage, setPlaceSearchMessage] = useState("");
+  const [scoreImage, setScoreImage] = useState(null);
+  const [isCameraModalOpen, setIsCameraModalOpen] = useState(false);
+  const [isAnalyzingScoreImage, setIsAnalyzingScoreImage] = useState(false);
+  const [cameraMessage, setCameraMessage] = useState("");
   const [rolls, setRolls] = useState([]);
   const [records, setRecords] = useState([]);
   const [isSaving, setIsSaving] = useState(false);
@@ -549,6 +553,58 @@ export default function App() {
     setIsPlaceModalOpen(false);
   };
 
+  const handleScoreImageChange = (event) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    setScoreImage(file);
+    setCameraMessage("");
+    setIsCameraModalOpen(true);
+  };
+
+  const analyzeScoreImage = async () => {
+    if (!scoreImage) {
+      setCameraMessage("분석할 사진을 먼저 선택해주세요.");
+      return;
+    }
+
+    const client = await getSupabaseClient();
+    if (!client) {
+      setCameraMessage("Supabase 연결 정보가 필요합니다.");
+      return;
+    }
+
+    setIsAnalyzingScoreImage(true);
+    setCameraMessage("");
+
+    try {
+      const formData = new FormData();
+      formData.append("image", scoreImage);
+
+      const { data, error } = await client.functions.invoke("parse-bowling-score", {
+        body: formData,
+      });
+
+      if (error) {
+        setCameraMessage("사진 분석 서버 함수가 아직 준비되지 않았거나 오류가 발생했습니다.");
+        return;
+      }
+
+      if (!Array.isArray(data?.rolls) || data.rolls.length === 0) {
+        setCameraMessage("점수판을 인식하지 못했습니다. 사진을 더 정면에서 다시 찍어주세요.");
+        return;
+      }
+
+      setRolls(data.rolls);
+      setIsCameraModalOpen(false);
+      setScoreImage(null);
+    } catch (error) {
+      setCameraMessage("사진 분석 중 오류가 발생했습니다. 다시 시도해주세요.");
+    } finally {
+      setIsAnalyzingScoreImage(false);
+    }
+  };
+
   const addRoll = (pins) => {
     if (!next || pins > next.max) return;
     setRolls((prev) => [...prev, pins]);
@@ -678,25 +734,10 @@ export default function App() {
 
             <div className="loginButtonGroup">
               <button className="googleLoginButton" onClick={signInWithGoogle}>
-                <span className="loginButtonInner">
-                  <img
-                    src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg"
-                    alt="Google"
-                  />
-                  <span>
-                    {inAppBrowser ? "Chrome으로 열기" : "Google 계정으로 로그인"}
-                  </span>
-                </span>
+                {inAppBrowser ? "Chrome으로 열기" : "Google 계정으로 로그인"}
               </button>
-
               <button className="kakaoLoginButton" onClick={signInWithKakao}>
-                <span className="loginButtonInner">
-                  <img
-                    src="https://upload.wikimedia.org/wikipedia/commons/e/e3/KakaoTalk_logo.svg"
-                    alt="Kakao"
-                  />
-                  <span>Kakao 계정으로 로그인</span>
-                </span>
+                Kakao 계정으로 로그인
               </button>
             </div>
           </div>
@@ -756,7 +797,18 @@ export default function App() {
             })}
           </div>
 
-          <div className="keypadTitle">핀 수 입력</div>
+          <div className="scoreInputHeader">
+            <div className="keypadTitle">핀 수 입력</div>
+            <label className="cameraButton">
+              📷 점수판 촬영
+              <input
+                type="file"
+                accept="image/*"
+                capture="environment"
+                onChange={handleScoreImageChange}
+              />
+            </label>
+          </div>
           <div className="pinGrid keypad">
             {keypadNumbers
               .filter((pins) => {
@@ -800,6 +852,42 @@ export default function App() {
             </button>
           </div>
         </section>
+
+        {isCameraModalOpen && (
+          <div className="placeModalBackdrop" onClick={() => setIsCameraModalOpen(false)}>
+            <div className="placeModal" onClick={(e) => e.stopPropagation()}>
+              <div className="placeModalHeader">
+                <div>
+                  <strong>점수판 사진 분석</strong>
+                  <span>볼링장 모니터를 정면으로 촬영해주세요.</span>
+                </div>
+                <button onClick={() => setIsCameraModalOpen(false)}>닫기</button>
+              </div>
+
+              {scoreImage && (
+                <img
+                  className="scoreImagePreview"
+                  src={URL.createObjectURL(scoreImage)}
+                  alt="점수판 미리보기"
+                />
+              )}
+
+              {cameraMessage && <div className="placeMessage">{cameraMessage}</div>}
+
+              <button
+                className="manualPlaceButton"
+                onClick={analyzeScoreImage}
+                disabled={isAnalyzingScoreImage}
+              >
+                {isAnalyzingScoreImage ? "분석 중..." : "사진으로 점수 입력"}
+              </button>
+
+              <p className="cameraGuide">
+                현재 기능은 Supabase Edge Function parse-bowling-score가 필요합니다. 서버 함수가 준비되면 사진에서 투구 기록을 읽어 자동 입력합니다.
+              </p>
+            </div>
+          </div>
+        )}
 
         {isPlaceModalOpen && (
           <div className="placeModalBackdrop" onClick={() => setIsPlaceModalOpen(false)}>

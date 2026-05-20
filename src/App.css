@@ -656,3 +656,41 @@ input {
   height: 20px;
   object-fit: contain;
 }
+
+.scoreInputHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.cameraButton {
+  cursor: pointer;
+  border: none;
+  border-radius: 999px;
+  background: #e0f2fe;
+  color: #0369a1;
+  padding: 8px 12px;
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.cameraButton input {
+  display: none;
+}
+
+.scoreImagePreview {
+  width: 100%;
+  max-height: 320px;
+  object-fit: contain;
+  border-radius: 16px;
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+}
+
+.cameraGuide {
+  margin: 10px 0 0;
+  color: #64748b;
+  font-size: 12px;
+  line-height: 1.5;
+}
