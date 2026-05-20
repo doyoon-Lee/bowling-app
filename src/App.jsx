@@ -103,9 +103,11 @@ function calcBowlingScore(rolls) {
 
     const [a, b, c] = tenthRolls;
     const tenthMark = formatFrameMark(a, b, c, frame);
-
     const tenthComplete = tenthRolls.length === 3 || (tenthRolls.length === 2 && a !== 10 && a + b < 10);
-    if (tenthComplete) score += tenthRolls.reduce((sum, roll) => sum + Number(roll ?? 0), 0);
+
+    if (tenthComplete) {
+      score += tenthRolls.reduce((sum, roll) => sum + Number(roll ?? 0), 0);
+    }
 
     frames.push({ frame, mark: tenthMark, total: tenthComplete ? score : "" });
   }
@@ -292,6 +294,17 @@ function getDayHigh(records) {
   return Math.max(...records.map((record) => Number(record.total || 0)));
 }
 
+function getDisplayUserName(user) {
+  return (
+    user?.email ||
+    user?.user_metadata?.email ||
+    user?.user_metadata?.full_name ||
+    user?.user_metadata?.name ||
+    user?.user_metadata?.nickname ||
+    "로그인 사용자"
+  );
+}
+
 function isInAppBrowser() {
   const ua = navigator.userAgent.toLowerCase();
 
@@ -389,7 +402,13 @@ export default function App() {
   useEffect(() => {
     if (!user) return;
 
-    const defaultName = user.user_metadata?.full_name || user.email?.split("@")[0] || "";
+    const defaultName =
+      user.user_metadata?.full_name ||
+      user.user_metadata?.name ||
+      user.user_metadata?.nickname ||
+      user.email?.split("@")[0] ||
+      "";
+
     setPlayerName((prev) => prev || defaultName);
   }, [user]);
 
@@ -421,10 +440,15 @@ export default function App() {
         .channel(`bowling-games-${user.id}`)
         .on(
           "postgres_changes",
-          { event: "*", schema: "public", table: "bowling_games", filter: `user_id=eq.${user.id}` },
+          {
+            event: "*",
+            schema: "public",
+            table: "bowling_games",
+            filter: `user_id=eq.${user.id}`,
+          },
           fetchMyRecords
         )
-.subscribe();
+        .subscribe();
     }
 
     loadRecords();
@@ -585,12 +609,25 @@ export default function App() {
         body: formData,
       });
 
+      console.log("Edge Function Response:", data);
+      console.log("Edge Function Error:", error);
+
       if (error) {
-        setCameraMessage("사진 분석 서버 함수가 아직 준비되지 않았거나 오류가 발생했습니다.");
+        setCameraMessage(`사진 분석 오류: ${error.message || "Edge Function 호출 실패"}`);
         return;
       }
 
-      if (!Array.isArray(data?.rolls) || data.rolls.length === 0) {
+      if (!data) {
+        setCameraMessage("서버 응답이 비어있습니다.");
+        return;
+      }
+
+      if (!Array.isArray(data.rolls)) {
+        setCameraMessage("rolls 데이터 형식이 올바르지 않습니다.");
+        return;
+      }
+
+      if (data.rolls.length === 0) {
         setCameraMessage("점수판을 인식하지 못했습니다. 사진을 더 정면에서 다시 찍어주세요.");
         return;
       }
@@ -598,8 +635,10 @@ export default function App() {
       setRolls(data.rolls);
       setIsCameraModalOpen(false);
       setScoreImage(null);
+      setCameraMessage("");
     } catch (error) {
-      setCameraMessage("사진 분석 중 오류가 발생했습니다. 다시 시도해주세요.");
+      console.error("Analyze Error:", error);
+      setCameraMessage(`사진 분석 중 오류 발생: ${error?.message || "알 수 없는 오류"}`);
     } finally {
       setIsAnalyzingScoreImage(false);
     }
@@ -618,6 +657,11 @@ export default function App() {
 
     if (!playerName.trim()) {
       alert("이름을 넣어주세요.");
+      return;
+    }
+
+    if (!user) {
+      alert("로그인 후 저장할 수 있습니다.");
       return;
     }
 
@@ -734,10 +778,17 @@ export default function App() {
 
             <div className="loginButtonGroup">
               <button className="googleLoginButton" onClick={signInWithGoogle}>
-                {inAppBrowser ? "Chrome으로 열기" : "Google 계정으로 로그인"}
+                <span className="loginButtonInner">
+                  <img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" alt="Google" />
+                  <span>{inAppBrowser ? "Chrome으로 열기" : "Google 계정으로 로그인"}</span>
+                </span>
               </button>
+
               <button className="kakaoLoginButton" onClick={signInWithKakao}>
-                Kakao 계정으로 로그인
+                <span className="loginButtonInner">
+                  <span className="kakaoLogoText">K</span>
+                  <span>Kakao 계정으로 로그인</span>
+                </span>
               </button>
             </div>
           </div>
@@ -752,7 +803,7 @@ export default function App() {
         <header className="header compactHeader">
           <div>
             <h1>🎳 Bowling Score</h1>
-            <p>{user?.email}</p>
+            <p>{getDisplayUserName(user)}</p>
           </div>
           <div className="headerActions">
             <button className="logoutButton" onClick={signOut}>로그아웃</button>
@@ -784,6 +835,7 @@ export default function App() {
               <strong className="smallScore">{next ? `${next.frame}F ${next.rollInFrame}구` : "완료"}</strong>
             </div>
           </div>
+
           <div className="laneScoreboard" ref={scoreboardRef}>
             {Array.from({ length: 10 }, (_, i) => {
               const frame = result.frames[i];
@@ -801,14 +853,10 @@ export default function App() {
             <div className="keypadTitle">핀 수 입력</div>
             <label className="cameraButton">
               📷 점수판 촬영
-              <input
-                type="file"
-                accept="image/*"
-                capture="environment"
-                onChange={handleScoreImageChange}
-              />
+              <input type="file" accept="image/*" capture="environment" onChange={handleScoreImageChange} />
             </label>
           </div>
+
           <div className="pinGrid keypad">
             {keypadNumbers
               .filter((pins) => {
@@ -865,20 +913,12 @@ export default function App() {
               </div>
 
               {scoreImage && (
-                <img
-                  className="scoreImagePreview"
-                  src={URL.createObjectURL(scoreImage)}
-                  alt="점수판 미리보기"
-                />
+                <img className="scoreImagePreview" src={URL.createObjectURL(scoreImage)} alt="점수판 미리보기" />
               )}
 
               {cameraMessage && <div className="placeMessage">{cameraMessage}</div>}
 
-              <button
-                className="manualPlaceButton"
-                onClick={analyzeScoreImage}
-                disabled={isAnalyzingScoreImage}
-              >
+              <button className="manualPlaceButton" onClick={analyzeScoreImage} disabled={isAnalyzingScoreImage}>
                 {isAnalyzingScoreImage ? "분석 중..." : "사진으로 점수 입력"}
               </button>
 
@@ -902,9 +942,7 @@ export default function App() {
 
               {isSearchingPlace && <div className="placeLoading">주변 볼링장을 검색 중입니다...</div>}
 
-              {!isSearchingPlace && placeSearchMessage && (
-                <div className="placeMessage">{placeSearchMessage}</div>
-              )}
+              {!isSearchingPlace && placeSearchMessage && <div className="placeMessage">{placeSearchMessage}</div>}
 
               {!isSearchingPlace && placeCandidates.length > 0 && (
                 <div className="placeList">
