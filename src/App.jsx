@@ -1,5 +1,4 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
-import { createWorker } from "tesseract.js";
 import "./App.css";
 
 let supabase = null;
@@ -322,95 +321,6 @@ function openCurrentPageInExternalBrowser() {
   window.location.href = currentUrl;
 }
 
-function normalizeOcrText(text) {
-  return text
-    .toUpperCase()
-    .replace(/[×✕＊*]/g, "X")
-    .replace(/[／]/g, "/")
-    .replace(/[–—_]/g, "-")
-    .replace(/O/g, "0")
-    .replace(/I/g, "1")
-    .replace(/S/g, "5")
-    .replace(/[^0-9X/\-\s|]/g, " ")
-    .replace(/\s+/g, " ")
-    .trim();
-}
-
-function parseOcrTextToRolls(text) {
-  const normalized = normalizeOcrText(text);
-  const tokens = normalized.match(/10|[0-9]|X|\/|-/g) || [];
-  const rolls = [];
-
-  let frame = 1;
-  let rollInFrame = 1;
-  let firstRollInFrame = null;
-
-  for (const token of tokens) {
-    if (frame > 10) break;
-
-    let value;
-
-    if (token === "X") value = 10;
-    else if (token === "-") value = 0;
-    else if (token === "/") {
-      if (firstRollInFrame === null) continue;
-      value = Math.max(0, 10 - firstRollInFrame);
-    } else {
-      value = Number(token);
-    }
-
-    if (!Number.isInteger(value) || value < 0 || value > 10) continue;
-
-    if (frame < 10) {
-      if (rollInFrame === 1) {
-        rolls.push(value);
-
-        if (value === 10) {
-          frame += 1;
-          rollInFrame = 1;
-          firstRollInFrame = null;
-        } else {
-          firstRollInFrame = value;
-          rollInFrame = 2;
-        }
-      } else {
-        if (firstRollInFrame !== null && firstRollInFrame + value > 10) continue;
-        rolls.push(value);
-        frame += 1;
-        rollInFrame = 1;
-        firstRollInFrame = null;
-      }
-    } else {
-      const tenthStart = getCurrentFrameStartIndex(rolls, 10);
-      const tenth = rolls.slice(tenthStart);
-
-      if (tenth.length === 0) {
-        rolls.push(value);
-        firstRollInFrame = value;
-        continue;
-      }
-
-      if (tenth.length === 1) {
-        const first = tenth[0];
-        if (first !== 10 && first + value > 10) continue;
-        rolls.push(value);
-        continue;
-      }
-
-      if (tenth.length === 2) {
-        const [a, b] = tenth;
-        const hasBonus = a === 10 || a + b === 10;
-        if (!hasBonus) break;
-        if (a === 10 && b !== 10 && b + value > 10) continue;
-        rolls.push(value);
-        break;
-      }
-    }
-  }
-
-  return rolls.slice(0, 21);
-}
-
 export default function App() {
   const [session, setSession] = useState(null);
   const [authLoading, setAuthLoading] = useState(true);
@@ -424,6 +334,8 @@ export default function App() {
   const [isCameraModalOpen, setIsCameraModalOpen] = useState(false);
   const [isAnalyzingScoreImage, setIsAnalyzingScoreImage] = useState(false);
   const [cameraMessage, setCameraMessage] = useState("");
+  const [ocrPreviewRolls, setOcrPreviewRolls] = useState([]);
+  const [ocrRawText, setOcrRawText] = useState("");
   const [rolls, setRolls] = useState([]);
   const [records, setRecords] = useState([]);
   const [isSaving, setIsSaving] = useState(false);
@@ -660,6 +572,8 @@ export default function App() {
 
     setScoreImage(file);
     setCameraMessage("");
+    setOcrPreviewRolls([]);
+    setOcrRawText("");
     setIsCameraModalOpen(true);
   };
 
@@ -669,49 +583,80 @@ export default function App() {
       return;
     }
 
-    setIsAnalyzingScoreImage(true);
-    setCameraMessage("OCR 준비 중입니다. 처음 실행은 10~30초 정도 걸릴 수 있습니다.");
+    const url = import.meta.env.VITE_SUPABASE_URL;
+    const anonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
 
-    let worker;
+    if (!url || !anonKey) {
+      setCameraMessage("Supabase URL 또는 ANON KEY가 설정되지 않았습니다.");
+      return;
+    }
+
+    setIsAnalyzingScoreImage(true);
+    setCameraMessage("Gemini가 점수판 사진을 분석 중입니다...");
 
     try {
-      worker = await createWorker("eng", 1, {
-        logger: (message) => {
-          if (message.status === "recognizing text") {
-            const progress = Math.round((message.progress || 0) * 100);
-            setCameraMessage(`점수판 글자를 읽는 중입니다... ${progress}%`);
-          }
+      const formData = new FormData();
+      formData.append("image", scoreImage);
+
+      const response = await fetch(`${url}/functions/v1/parse-bowling-score`, {
+        method: "POST",
+        headers: {
+          apikey: anonKey,
+          Authorization: `Bearer ${session?.access_token || anonKey}`,
         },
+        body: formData,
       });
 
-      await worker.setParameters({
-        tessedit_char_whitelist: "0123456789Xx/-| ",
-        preserve_interword_spaces: "1",
-      });
+      const responseText = await response.text();
+      console.log("Gemini Edge Function Status:", response.status);
+      console.log("Gemini Edge Function Response:", responseText);
 
-      const { data } = await worker.recognize(scoreImage);
-      const text = data?.text || "";
+      let data = null;
 
-      console.log("Tesseract OCR Raw Text:", text);
-
-      const parsedRolls = parseOcrTextToRolls(text);
-
-      if (!parsedRolls.length) {
-        setCameraMessage(`점수판을 인식하지 못했습니다. OCR 결과: ${normalizeOcrText(text) || "비어 있음"}`);
+      try {
+        data = responseText ? JSON.parse(responseText) : null;
+      } catch {
+        setCameraMessage(`사진 분석 응답 파싱 실패: ${responseText}`);
         return;
       }
 
-      setRolls(parsedRolls);
-      setIsCameraModalOpen(false);
-      setScoreImage(null);
-      setCameraMessage("");
+      if (!response.ok) {
+        setCameraMessage(
+          `사진 분석 오류 (${response.status}): ${data?.error || "알 수 없는 오류"}${data?.detail ? ` / ${data.detail}` : ""}`
+        );
+        return;
+      }
+
+      if (!data || !Array.isArray(data.rolls)) {
+        setCameraMessage(`Gemini 응답 형식이 올바르지 않습니다: ${JSON.stringify(data)}`);
+        return;
+      }
+
+      if (data.rolls.length === 0) {
+        setCameraMessage(data.notes || "점수판을 인식하지 못했습니다. 사진을 더 정면에서 다시 찍어주세요.");
+        return;
+      }
+
+      setOcrPreviewRolls(data.rolls);
+      setOcrRawText(data.notes || `confidence: ${data.confidence ?? "정보 없음"}`);
+      setCameraMessage("Gemini 분석 결과를 확인한 뒤 맞으면 적용해주세요.");
     } catch (error) {
-      console.error("Tesseract Analyze Error:", error);
-      setCameraMessage(`OCR 분석 중 오류 발생: ${error?.message || "알 수 없는 오류"}`);
+      console.error("Gemini Analyze Error:", error);
+      setCameraMessage(`사진 분석 중 오류 발생: ${error?.message || "알 수 없는 오류"}`);
     } finally {
-      if (worker) await worker.terminate();
       setIsAnalyzingScoreImage(false);
     }
+  };
+
+  const applyOcrPreview = () => {
+    if (!ocrPreviewRolls.length) return;
+
+    setRolls(ocrPreviewRolls);
+    setIsCameraModalOpen(false);
+    setScoreImage(null);
+    setCameraMessage("");
+    setOcrPreviewRolls([]);
+    setOcrRawText("");
   };
 
   const addRoll = (pins) => {
@@ -984,12 +929,26 @@ export default function App() {
 
               {cameraMessage && <div className="placeMessage">{cameraMessage}</div>}
 
+              {ocrPreviewRolls.length > 0 && (
+                <div className="ocrPreviewBox">
+                  <strong>Gemini 분석 투구값</strong>
+                  <p>{ocrPreviewRolls.map((roll) => formatRollMark(roll)).join(" · ")}</p>
+                  <small>분석 메모: {ocrRawText || "없음"}</small>
+                </div>
+              )}
+
               <button className="manualPlaceButton" onClick={analyzeScoreImage} disabled={isAnalyzingScoreImage}>
-                {isAnalyzingScoreImage ? "분석 중..." : "사진으로 점수 입력"}
+                {isAnalyzingScoreImage ? "분석 중..." : "사진 분석하기"}
               </button>
 
+              {ocrPreviewRolls.length > 0 && (
+                <button className="manualPlaceButton primaryModalButton" onClick={applyOcrPreview}>
+                  인식 결과 적용
+                </button>
+              )}
+
               <p className="cameraGuide">
-                현재 기능은 Tesseract.js OCR로 브라우저에서 직접 분석합니다. 인식이 부정확하면 사진을 더 정면에서 크게 찍어주세요.
+                Gemini Vision으로 사진을 분석합니다. 결과가 다를 수 있으니 적용 전 투구값을 꼭 확인해주세요.
               </p>
             </div>
           </div>
