@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
+import { createWorker } from "tesseract.js";
 import "./App.css";
 
 let supabase = null;
@@ -167,16 +168,11 @@ function getFrameRollLimit(rolls) {
     const [a, b] = tenth;
 
     if (a === 10) {
-      if (b === 10) {
-        return { frame: 10, rollInFrame: 3, max: 10, canStrike: true };
-      }
-
+      if (b === 10) return { frame: 10, rollInFrame: 3, max: 10, canStrike: true };
       return { frame: 10, rollInFrame: 3, max: 10 - b, canStrike: false };
     }
 
-    if (a + b === 10) {
-      return { frame: 10, rollInFrame: 3, max: 10, canStrike: true };
-    }
+    if (a + b === 10) return { frame: 10, rollInFrame: 3, max: 10, canStrike: true };
 
     return null;
   }
@@ -212,7 +208,6 @@ function formatPinButton(pins, next, rolls) {
 
     if (firstRoll !== undefined) {
       const spareValue = 10 - firstRoll;
-
       if (pins === spareValue) return "/";
       if (pins === 0) return "-";
     }
@@ -230,7 +225,6 @@ function formatPinButton(pins, next, rolls) {
   }
 
   if (pins === 0) return "-";
-
   return String(pins);
 }
 
@@ -244,9 +238,7 @@ function renderFrameMark(mark) {
     .map((part) => part.trim())
     .filter((part) => part.length > 0);
 
-  if (parts.length === 1) {
-    return <span className="markPart single">{parts[0]}</span>;
-  }
+  if (parts.length === 1) return <span className="markPart single">{parts[0]}</span>;
 
   return parts.map((part, index) => (
     <React.Fragment key={`${part}-${index}`}>
@@ -328,6 +320,95 @@ function openCurrentPageInExternalBrowser() {
   }
 
   window.location.href = currentUrl;
+}
+
+function normalizeOcrText(text) {
+  return text
+    .toUpperCase()
+    .replace(/[×✕＊*]/g, "X")
+    .replace(/[／]/g, "/")
+    .replace(/[–—_]/g, "-")
+    .replace(/O/g, "0")
+    .replace(/I/g, "1")
+    .replace(/S/g, "5")
+    .replace(/[^0-9X/\-\s|]/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function parseOcrTextToRolls(text) {
+  const normalized = normalizeOcrText(text);
+  const tokens = normalized.match(/10|[0-9]|X|\/|-/g) || [];
+  const rolls = [];
+
+  let frame = 1;
+  let rollInFrame = 1;
+  let firstRollInFrame = null;
+
+  for (const token of tokens) {
+    if (frame > 10) break;
+
+    let value;
+
+    if (token === "X") value = 10;
+    else if (token === "-") value = 0;
+    else if (token === "/") {
+      if (firstRollInFrame === null) continue;
+      value = Math.max(0, 10 - firstRollInFrame);
+    } else {
+      value = Number(token);
+    }
+
+    if (!Number.isInteger(value) || value < 0 || value > 10) continue;
+
+    if (frame < 10) {
+      if (rollInFrame === 1) {
+        rolls.push(value);
+
+        if (value === 10) {
+          frame += 1;
+          rollInFrame = 1;
+          firstRollInFrame = null;
+        } else {
+          firstRollInFrame = value;
+          rollInFrame = 2;
+        }
+      } else {
+        if (firstRollInFrame !== null && firstRollInFrame + value > 10) continue;
+        rolls.push(value);
+        frame += 1;
+        rollInFrame = 1;
+        firstRollInFrame = null;
+      }
+    } else {
+      const tenthStart = getCurrentFrameStartIndex(rolls, 10);
+      const tenth = rolls.slice(tenthStart);
+
+      if (tenth.length === 0) {
+        rolls.push(value);
+        firstRollInFrame = value;
+        continue;
+      }
+
+      if (tenth.length === 1) {
+        const first = tenth[0];
+        if (first !== 10 && first + value > 10) continue;
+        rolls.push(value);
+        continue;
+      }
+
+      if (tenth.length === 2) {
+        const [a, b] = tenth;
+        const hasBonus = a === 10 || a + b === 10;
+        if (!hasBonus) break;
+        if (a === 10 && b !== 10 && b + value > 10) continue;
+        rolls.push(value);
+        break;
+      }
+    }
+  }
+
+  return rolls.slice(0, 21);
 }
 
 export default function App() {
@@ -472,14 +553,10 @@ export default function App() {
       return;
     }
 
-    const oauthOptions = {
-      redirectTo: window.location.origin,
-    };
+    const oauthOptions = { redirectTo: window.location.origin };
 
     if (provider === "kakao") {
-      oauthOptions.queryParams = {
-        prompt: "login",
-      };
+      oauthOptions.queryParams = { prompt: "login" };
     }
 
     const { error } = await client.auth.signInWithOAuth({
@@ -592,75 +669,47 @@ export default function App() {
       return;
     }
 
-    const url = import.meta.env.VITE_SUPABASE_URL;
-    const anonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
-
-    if (!url || !anonKey) {
-      setCameraMessage("Supabase URL 또는 ANON KEY가 설정되지 않았습니다.");
-      return;
-    }
-
     setIsAnalyzingScoreImage(true);
-    setCameraMessage("");
+    setCameraMessage("OCR 준비 중입니다. 처음 실행은 10~30초 정도 걸릴 수 있습니다.");
+
+    let worker;
 
     try {
-      const formData = new FormData();
-      formData.append("image", scoreImage);
-
-      const response = await fetch(`${url}/functions/v1/parse-bowling-score`, {
-        method: "POST",
-        headers: {
-          apikey: anonKey,
-          Authorization: `Bearer ${session?.access_token || anonKey}`,
+      worker = await createWorker("eng", 1, {
+        logger: (message) => {
+          if (message.status === "recognizing text") {
+            const progress = Math.round((message.progress || 0) * 100);
+            setCameraMessage(`점수판 글자를 읽는 중입니다... ${progress}%`);
+          }
         },
-        body: formData,
       });
 
-      const responseText = await response.text();
-      console.log("Edge Function HTTP Status:", response.status);
-      console.log("Edge Function Raw Response:", responseText);
+      await worker.setParameters({
+        tessedit_char_whitelist: "0123456789Xx/-| ",
+        preserve_interword_spaces: "1",
+      });
 
-      let data = null;
+      const { data } = await worker.recognize(scoreImage);
+      const text = data?.text || "";
 
-      try {
-        data = responseText ? JSON.parse(responseText) : null;
-      } catch {
-        setCameraMessage(`사진 분석 응답 파싱 실패: ${responseText}`);
+      console.log("Tesseract OCR Raw Text:", text);
+
+      const parsedRolls = parseOcrTextToRolls(text);
+
+      if (!parsedRolls.length) {
+        setCameraMessage(`점수판을 인식하지 못했습니다. OCR 결과: ${normalizeOcrText(text) || "비어 있음"}`);
         return;
       }
 
-      if (!response.ok) {
-        setCameraMessage(
-          `사진 분석 오류 (${response.status}): ${data?.error || "알 수 없는 오류"}${data?.detail ? ` / ${data.detail}` : ""}`
-        );
-        return;
-      }
-
-      if (!data) {
-        setCameraMessage("서버 응답이 비어있습니다.");
-        return;
-      }
-
-      if (!Array.isArray(data.rolls)) {
-        setCameraMessage(`rolls 데이터 형식이 올바르지 않습니다: ${JSON.stringify(data)}`);
-        return;
-      }
-
-      if (data.rolls.length === 0) {
-        setCameraMessage(
-          data.notes || "점수판을 인식하지 못했습니다. 사진을 더 정면에서 다시 찍어주세요."
-        );
-        return;
-      }
-
-      setRolls(data.rolls);
+      setRolls(parsedRolls);
       setIsCameraModalOpen(false);
       setScoreImage(null);
       setCameraMessage("");
     } catch (error) {
-      console.error("Analyze Error:", error);
-      setCameraMessage(`사진 분석 중 오류 발생: ${error?.message || "알 수 없는 오류"}`);
+      console.error("Tesseract Analyze Error:", error);
+      setCameraMessage(`OCR 분석 중 오류 발생: ${error?.message || "알 수 없는 오류"}`);
     } finally {
+      if (worker) await worker.terminate();
       setIsAnalyzingScoreImage(false);
     }
   };
@@ -736,9 +785,7 @@ export default function App() {
     if (!window.confirm("이 기록을 삭제할까요?")) return;
 
     const client = await getSupabaseClient();
-    if (!client) return;
-
-    if (!user) return;
+    if (!client || !user) return;
 
     const { error } = await client
       .from("bowling_games")
@@ -882,13 +929,11 @@ export default function App() {
             {keypadNumbers
               .filter((pins) => {
                 if (pins !== 10) return true;
-
                 if (next?.canStrike) return true;
 
                 if (next?.rollInFrame === 2) {
                   const currentFrameStart = getCurrentFrameStartIndex(rolls, next.frame);
-                  const firstRoll = rolls[currentFrameStart];
-                  return firstRoll === 0;
+                  return rolls[currentFrameStart] === 0;
                 }
 
                 return false;
@@ -944,7 +989,7 @@ export default function App() {
               </button>
 
               <p className="cameraGuide">
-                현재 기능은 Supabase Edge Function parse-bowling-score가 필요합니다. 서버 함수가 준비되면 사진에서 투구 기록을 읽어 자동 입력합니다.
+                현재 기능은 Tesseract.js OCR로 브라우저에서 직접 분석합니다. 인식이 부정확하면 사진을 더 정면에서 크게 찍어주세요.
               </p>
             </div>
           </div>
@@ -962,7 +1007,6 @@ export default function App() {
               </div>
 
               {isSearchingPlace && <div className="placeLoading">주변 볼링장을 검색 중입니다...</div>}
-
               {!isSearchingPlace && placeSearchMessage && <div className="placeMessage">{placeSearchMessage}</div>}
 
               {!isSearchingPlace && placeCandidates.length > 0 && (
