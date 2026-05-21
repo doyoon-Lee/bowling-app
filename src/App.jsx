@@ -984,27 +984,15 @@ export default function App() {
               {ocrPreviewRolls.length > 0 && (
                 <div className="ocrPreviewBox">
                   <strong>Gemini 분석 투구값</strong>
-                  <div className="geminiPreviewTable">
-                    <div className="geminiPreviewHead">
-                      <span>F</span>
-                      <span>표기</span>
-                      <span>투구값</span>
-                    </div>
+                  <div className="geminiScoreboardPreview">
                     {(geminiPreviewFrames.length > 0 ? geminiPreviewFrames : calcBowlingScore(ocrPreviewRolls).frames).map((frame) => (
-                      <div className="geminiPreviewRow" key={frame.frame}>
-                        <span>{frame.frame}</span>
-                        <strong>{frame.mark || "-"}</strong>
-                        <em>
-                          {Array.isArray(frame.rolls)
-                            ? frame.rolls.map((roll) => formatRollMark(roll)).join(" · ")
-                            : "-"}
-                        </em>
+                      <div className="geminiScoreFrame" key={frame.frame}>
+                        <div className="geminiScoreFrameNo">{frame.frame}</div>
+                        <div className="geminiScoreFrameMark">
+                          {renderFrameMark(frame.mark || "")}
+                        </div>
                       </div>
                     ))}
-                  </div>
-                  <div className="geminiPreviewSummary">
-                    <span>전체 투구값</span>
-                    <b>{ocrPreviewRolls.map((roll) => formatRollMark(roll)).join(" · ")}</b>
                   </div>
                   <small>분석 메모: {ocrRawText || "없음"}</small>
                 </div>
