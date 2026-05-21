@@ -466,6 +466,16 @@ function isGutterSpareAvailable(next, rolls) {
   return rolls[currentFrameStart] === 0;
 }
 
+function isTenthFrameGutterSpareAvailable(next, rolls) {
+  if (!next || next.frame !== 10 || next.rollInFrame !== 3) return false;
+
+  const tenthStart = getCurrentFrameStartIndex(rolls, 10);
+  const firstRoll = rolls[tenthStart];
+  const secondRoll = rolls[tenthStart + 1];
+
+  return firstRoll === 10 && secondRoll === 0;
+}
+
 export default function App() {
   const [session, setSession] = useState(null);
   const [authLoading, setAuthLoading] = useState(true);
@@ -1070,17 +1080,19 @@ export default function App() {
               .filter((pins) => {
                 if (pins !== 10) return true;
                 if (next?.canStrike) return true;
-                return isGutterSpareAvailable(next, rolls);
+                if (isGutterSpareAvailable(next, rolls)) return true;
+                return isTenthFrameGutterSpareAvailable(next, rolls);
               })
               .map((pins) => {
                 const isGutterSpareButton = pins === 10 && isGutterSpareAvailable(next, rolls);
+                const isTenthGutterSpareButton = pins === 10 && isTenthFrameGutterSpareAvailable(next, rolls);
 
                 return (
                   <button
                     key={pins}
-                    disabled={!next || pins > next.max || (pins === 10 && !next.canStrike && !isGutterSpareButton)}
+                    disabled={!next || pins > next.max || (pins === 10 && !next.canStrike && !isGutterSpareButton && !isTenthGutterSpareButton)}
                     onClick={() => addRoll(pins)}
-                    className={pins === 10 && (next?.canStrike || isGutterSpareButton) ? "pin strike" : "pin"}
+                    className={pins === 10 && next?.canStrike ? "pin strike" : "pin"}
                   >
                     {formatPinButton(pins, next, rolls)}
                   </button>
