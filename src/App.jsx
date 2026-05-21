@@ -195,11 +195,18 @@ function formatPinButton(pins, next, rolls) {
 
   if (pins === 10 && next.canStrike) return "X";
 
-  if (pins === 10 && next.rollInFrame === 2) {
-    const currentFrameStart = getCurrentFrameStartIndex(rolls, next.frame);
-    const firstRoll = rolls[currentFrameStart];
-    if (firstRoll === 0) return "/";
+if (
+  next.frame < 10 &&
+  pins === 10 &&
+  next.rollInFrame === 2
+) {
+  const currentFrameStart = getCurrentFrameStartIndex(rolls, next.frame);
+  const firstRoll = rolls[currentFrameStart];
+
+  if (firstRoll === 0) {
+    return "/";
   }
+}
 
   if (next.rollInFrame === 2) {
     const currentFrameStart = getCurrentFrameStartIndex(rolls, next.frame);
