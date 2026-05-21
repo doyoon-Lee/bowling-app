@@ -492,6 +492,7 @@ export default function App() {
   const [ocrPreviewRolls, setOcrPreviewRolls] = useState([]);
   const [ocrRawText, setOcrRawText] = useState("");
   const [geminiPreviewFrames, setGeminiPreviewFrames] = useState([]);
+  const [analysisAttempt, setAnalysisAttempt] = useState(0);
   const [rolls, setRolls] = useState([]);
   const [records, setRecords] = useState([]);
   const [isSaving, setIsSaving] = useState(false);
@@ -754,6 +755,7 @@ export default function App() {
     setOcrPreviewRolls([]);
     setOcrRawText("");
     setGeminiPreviewFrames([]);
+    setAnalysisAttempt(0);
     setIsCameraModalOpen(true);
   };
 
@@ -777,6 +779,19 @@ export default function App() {
     try {
       const formData = new FormData();
       formData.append("image", scoreImage);
+
+      if (ocrPreviewRolls.length > 0 || geminiPreviewFrames.length > 0) {
+        formData.append(
+          "previous_result_json",
+          JSON.stringify({
+            rolls: ocrPreviewRolls,
+            frames: geminiPreviewFrames,
+            note: "사용자가 기존 분석 결과가 실제 사진과 다르다고 판단하여 재분석을 요청했습니다. 이전 결과를 그대로 반복하지 말고 사진을 다시 검토하세요.",
+          })
+        );
+      }
+
+      formData.append("retry_attempt", String(analysisAttempt + 1));
 
       const response = await fetch(`${url}/functions/v1/parse-bowling-score`, {
         method: "POST",
@@ -836,6 +851,7 @@ export default function App() {
       setOcrPreviewRolls(repairedRolls);
       setGeminiPreviewFrames(previewFrames);
       setOcrRawText(data.notes || `confidence: ${data.confidence ?? "정보 없음"}`);
+      setAnalysisAttempt((prev) => prev + 1);
       setCameraMessage("Gemini 분석 결과를 확인한 뒤 맞으면 적용해주세요.");
     } catch (error) {
       console.error("Gemini Analyze Error:", error);
@@ -855,6 +871,7 @@ export default function App() {
     setOcrPreviewRolls([]);
     setOcrRawText("");
     setGeminiPreviewFrames([]);
+    setAnalysisAttempt(0);
   };
 
   const addRoll = (pins) => {
@@ -1144,7 +1161,7 @@ export default function App() {
               )}
 
               <button className="manualPlaceButton" onClick={analyzeScoreImage} disabled={isAnalyzingScoreImage}>
-                {isAnalyzingScoreImage ? "분석 중..." : "사진 분석하기"}
+                {isAnalyzingScoreImage ? "분석 중..." : ocrPreviewRolls.length > 0 ? "다시 분석하기" : "사진 분석하기"}
               </button>
 
               {ocrPreviewRolls.length > 0 && (
