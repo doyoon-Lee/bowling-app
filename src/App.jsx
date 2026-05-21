@@ -287,6 +287,7 @@ function getDayHigh(records) {
 
 function getDisplayUserName(user) {
   return (
+    user?.user_metadata?.guest_name ||
     user?.email ||
     user?.user_metadata?.email ||
     user?.user_metadata?.full_name ||
@@ -294,6 +295,11 @@ function getDisplayUserName(user) {
     user?.user_metadata?.nickname ||
     "로그인 사용자"
   );
+}
+
+function createGuestName() {
+  const randomNumber = Math.floor(10000 + Math.random() * 90000);
+  return `Guest_${randomNumber}`;
 }
 
 function isInAppBrowser() {
@@ -321,112 +327,8 @@ function openCurrentPageInExternalBrowser() {
   window.location.href = currentUrl;
 }
 
-function parseGeminiFrameRolls(frame) {
-  const frameNo = Number(frame?.frame);
-
-  const mark = String(frame?.mark || "")
-    .toUpperCase()
-    .replace(/[×✕＊*]/g, "X")
-    .replace(/[／]/g, "/")
-    .replace(/[–—_]/g, "-")
-    .replace(/\s+/g, "")
-    .trim();
-
-  const fallback = Array.isArray(frame?.rolls)
-    ? frame.rolls
-        .map((roll) => Number(roll))
-        .filter((roll) => Number.isInteger(roll) && roll >= 0 && roll <= 10)
-    : [];
-
-  if (!frameNo || !mark) return fallback;
-
-  // 1~9 프레임
-  if (frameNo < 10) {
-    // 스트라이크
-    if (mark.includes("X")) {
-      return [10];
-    }
-
-    // 스페어
-    if (mark.includes("/")) {
-      const firstToken = mark.match(/[0-9-]/)?.[0];
-
-      const first =
-        firstToken === "-"
-          ? 0
-          : Number(firstToken);
-
-      if (
-        Number.isInteger(first) &&
-        first >= 0 &&
-        first <= 9
-      ) {
-        return [first, 10 - first];
-      }
-    }
-
-    // 일반 오픈 프레임
-    const digits = mark.match(/[0-9-]/g) || [];
-
-    if (digits.length >= 2) {
-      const first = digits[0] === "-" ? 0 : Number(digits[0]);
-      const second = digits[1] === "-" ? 0 : Number(digits[1]);
-
-      if (
-        Number.isInteger(first) &&
-        Number.isInteger(second) &&
-        first + second <= 10
-      ) {
-        return [first, second];
-      }
-    }
-
-    return fallback;
-  }
-
-  // 10프레임
-  const tokens = mark.match(/X|\/|[0-9-]/g) || [];
-  const rolls = [];
-
-  tokens.forEach((token) => {
-    if (token === "X") {
-      rolls.push(10);
-      return;
-    }
-
-    if (token === "-") {
-      rolls.push(0);
-      return;
-    }
-
-    if (token === "/") {
-      const prev = rolls[rolls.length - 1];
-
-      if (Number.isInteger(prev)) {
-        rolls.push(10 - prev);
-      }
-
-      return;
-    }
-
-    const value = Number(token);
-
-    if (
-      Number.isInteger(value) &&
-      value >= 0 &&
-      value <= 10
-    ) {
-      rolls.push(value);
-    }
-  });
-
-  return rolls.slice(0, 3);
-}
-
 function normalizeGeminiRollsFromFrames(frames, fallbackRolls = []) {
-  if (!Array.isArray(frames) || frames.length === 0) {
-    return fallbackRolls;
-  }
+  if (!Array.isArray(frames) || frames.length === 0) return fallbackRolls;
 
   const rebuilt = [];
 
@@ -434,16 +336,17 @@ function normalizeGeminiRollsFromFrames(frames, fallbackRolls = []) {
     .slice()
     .sort((a, b) => Number(a.frame || 0) - Number(b.frame || 0))
     .forEach((frame) => {
-      const frameRolls = parseGeminiFrameRolls(frame);
+      if (!Array.isArray(frame.rolls)) return;
 
-      frameRolls.forEach((roll) => {
-        rebuilt.push(roll);
+      frame.rolls.forEach((roll) => {
+        const value = Number(roll);
+        if (Number.isInteger(value) && value >= 0 && value <= 10) {
+          rebuilt.push(value);
+        }
       });
     });
 
-  return rebuilt.length > 0
-    ? rebuilt.slice(0, 21)
-    : fallbackRolls;
+  return rebuilt.length > 0 ? rebuilt.slice(0, 21) : fallbackRolls;
 }
 
 function repairTenthFrameRolls(rolls, frames = []) {
@@ -557,6 +460,7 @@ export default function App() {
     if (!user) return;
 
     const defaultName =
+      user.user_metadata?.guest_name ||
       user.user_metadata?.full_name ||
       user.user_metadata?.name ||
       user.user_metadata?.nickname ||
@@ -642,6 +546,28 @@ export default function App() {
 
   const signInWithGoogle = () => signInWithProvider("google");
   const signInWithKakao = () => signInWithProvider("kakao");
+
+  const signInAsGuest = async () => {
+    const client = await getSupabaseClient();
+    if (!client) {
+      alert(".env 파일에 VITE_SUPABASE_URL, VITE_SUPABASE_ANON_KEY를 설정해야 합니다.");
+      return;
+    }
+
+    const guestName = createGuestName();
+
+    const { error } = await client.auth.signInAnonymously({
+      options: {
+        data: {
+          guest_name: guestName,
+        },
+      },
+    });
+
+    if (error) {
+      alert(`게스트 로그인 실패: ${error.message}`);
+    }
+  };
 
   const signOut = async () => {
     const client = await getSupabaseClient();
@@ -971,6 +897,13 @@ export default function App() {
                 <span className="loginButtonInner">
                   <span className="kakaoLogoText">K</span>
                   <span>Kakao 계정으로 로그인</span>
+                </span>
+              </button>
+
+              <button className="guestLoginButton" onClick={signInAsGuest}>
+                <span className="loginButtonInner">
+                  <span className="guestLogoText">G</span>
+                  <span>게스트로 시작하기</span>
                 </span>
               </button>
             </div>
