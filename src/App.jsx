@@ -363,6 +363,21 @@ function repairTenthFrameRolls(rolls, frames = []) {
   return repaired.slice(0, 21);
 }
 
+function getPreviewFrameMark(frame) {
+  if (Array.isArray(frame?.rolls) && frame.rolls.length > 0) {
+    const [first, second, third] = frame.rolls.map((roll) => Number(roll));
+    return formatFrameMark(first, second, third, Number(frame.frame));
+  }
+
+  const rawMark = String(frame?.mark || "").trim();
+
+  if (Number(frame?.frame) < 10 && /^[0-9][0-9]$/.test(rawMark)) {
+    return rawMark[0] + " | " + rawMark[1];
+  }
+
+  return rawMark;
+}
+
 export default function App() {
   const [session, setSession] = useState(null);
   const [authLoading, setAuthLoading] = useState(true);
@@ -989,7 +1004,7 @@ export default function App() {
                       <div className="geminiScoreFrame" key={frame.frame}>
                         <div className="geminiScoreFrameNo">{frame.frame}</div>
                         <div className="geminiScoreFrameMark">
-                          {renderFrameMark(frame.mark || "")}
+                          {renderFrameMark(getPreviewFrameMark(frame))}
                         </div>
                       </div>
                     ))}
