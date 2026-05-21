@@ -193,24 +193,18 @@ function getCurrentFrameStartIndex(rolls, frame) {
 function formatPinButton(pins, next, rolls) {
   if (!next) return String(pins);
 
-  if (pins === 10 && next.canStrike) return "X";
-
-if (
-  next.frame < 10 &&
-  pins === 10 &&
-  next.rollInFrame === 2
-) {
   const currentFrameStart = getCurrentFrameStartIndex(rolls, next.frame);
   const firstRoll = rolls[currentFrameStart];
+  const secondRoll = rolls[currentFrameStart + 1];
+  const isTenthFrame = next.frame === 10;
 
-  if (firstRoll === 0) {
-    return "/";
-  }
-}
+  if (pins === 10 && next.canStrike) return "X";
 
   if (next.rollInFrame === 2) {
-    const currentFrameStart = getCurrentFrameStartIndex(rolls, next.frame);
-    const firstRoll = rolls[currentFrameStart];
+    if (isTenthFrame && firstRoll === 10) {
+      if (pins === 0) return "-";
+      return String(pins);
+    }
 
     if (firstRoll !== undefined) {
       const spareValue = 10 - firstRoll;
@@ -219,15 +213,13 @@ if (
     }
   }
 
-  if (next.frame === 10 && next.rollInFrame === 3) {
-    const currentFrameStart = getCurrentFrameStartIndex(rolls, 10);
-    const firstRoll = rolls[currentFrameStart];
-    const secondRoll = rolls[currentFrameStart + 1];
-
+  if (isTenthFrame && next.rollInFrame === 3) {
     if (firstRoll === 10 && secondRoll !== 10) {
       const spareValue = 10 - secondRoll;
       if (pins === spareValue) return "/";
     }
+
+    if (pins === 0) return "-";
   }
 
   if (pins === 0) return "-";
@@ -334,6 +326,86 @@ function openCurrentPageInExternalBrowser() {
   window.location.href = currentUrl;
 }
 
+function parseGeminiFrameRolls(frame) {
+  const frameNo = Number(frame?.frame);
+
+  const mark = String(frame?.mark || "")
+    .toUpperCase()
+    .replace(/[×✕＊*]/g, "X")
+    .replace(/[／]/g, "/")
+    .replace(/[–—_]/g, "-")
+    .replace(/\s+/g, "")
+    .trim();
+
+  const fallback = Array.isArray(frame?.rolls)
+    ? frame.rolls
+        .map((roll) => Number(roll))
+        .filter((roll) => Number.isInteger(roll) && roll >= 0 && roll <= 10)
+    : [];
+
+  if (!frameNo || !mark) return fallback;
+
+  if (frameNo < 10) {
+    if (mark.includes("X")) return [10];
+
+    if (mark.includes("/")) {
+      const firstToken = mark.match(/[0-9-]/)?.[0];
+      const first = firstToken === "-" ? 0 : Number(firstToken);
+
+      if (Number.isInteger(first) && first >= 0 && first <= 9) {
+        return [first, 10 - first];
+      }
+    }
+
+    const digits = mark.match(/[0-9-]/g) || [];
+
+    if (digits.length >= 2) {
+      const first = digits[0] === "-" ? 0 : Number(digits[0]);
+      const second = digits[1] === "-" ? 0 : Number(digits[1]);
+
+      if (
+        Number.isInteger(first) &&
+        Number.isInteger(second) &&
+        first >= 0 &&
+        second >= 0 &&
+        first + second <= 10
+      ) {
+        return [first, second];
+      }
+    }
+
+    return fallback;
+  }
+
+  const tokens = mark.match(/X|\/|[0-9-]/g) || [];
+  const rolls = [];
+
+  tokens.forEach((token) => {
+    if (token === "X") {
+      rolls.push(10);
+      return;
+    }
+
+    if (token === "-") {
+      rolls.push(0);
+      return;
+    }
+
+    if (token === "/") {
+      const prev = rolls[rolls.length - 1];
+      if (Number.isInteger(prev)) rolls.push(10 - prev);
+      return;
+    }
+
+    const value = Number(token);
+    if (Number.isInteger(value) && value >= 0 && value <= 10) {
+      rolls.push(value);
+    }
+  });
+
+  return rolls.length > 0 ? rolls.slice(0, 3) : fallback.slice(0, 3);
+}
+
 function normalizeGeminiRollsFromFrames(frames, fallbackRolls = []) {
   if (!Array.isArray(frames) || frames.length === 0) return fallbackRolls;
 
@@ -343,14 +415,8 @@ function normalizeGeminiRollsFromFrames(frames, fallbackRolls = []) {
     .slice()
     .sort((a, b) => Number(a.frame || 0) - Number(b.frame || 0))
     .forEach((frame) => {
-      if (!Array.isArray(frame.rolls)) return;
-
-      frame.rolls.forEach((roll) => {
-        const value = Number(roll);
-        if (Number.isInteger(value) && value >= 0 && value <= 10) {
-          rebuilt.push(value);
-        }
-      });
+      const frameRolls = parseGeminiFrameRolls(frame);
+      frameRolls.forEach((roll) => rebuilt.push(roll));
     });
 
   return rebuilt.length > 0 ? rebuilt.slice(0, 21) : fallbackRolls;
@@ -377,8 +443,10 @@ function repairTenthFrameRolls(rolls, frames = []) {
 }
 
 function getPreviewFrameMark(frame) {
-  if (Array.isArray(frame?.rolls) && frame.rolls.length > 0) {
-    const [first, second, third] = frame.rolls.map((roll) => Number(roll));
+  const parsedRolls = parseGeminiFrameRolls(frame);
+
+  if (parsedRolls.length > 0) {
+    const [first, second, third] = parsedRolls;
     return formatFrameMark(first, second, third, Number(frame.frame));
   }
 
@@ -389,6 +457,13 @@ function getPreviewFrameMark(frame) {
   }
 
   return rawMark;
+}
+
+function isGutterSpareAvailable(next, rolls) {
+  if (!next || next.frame >= 10 || next.rollInFrame !== 2) return false;
+
+  const currentFrameStart = getCurrentFrameStartIndex(rolls, next.frame);
+  return rolls[currentFrameStart] === 0;
 }
 
 export default function App() {
@@ -669,7 +744,6 @@ export default function App() {
     setOcrPreviewRolls([]);
     setOcrRawText("");
     setGeminiPreviewFrames([]);
-    setGeminiPreviewFrames([]);
     setIsCameraModalOpen(true);
   };
 
@@ -717,6 +791,16 @@ export default function App() {
       }
 
       if (!response.ok) {
+        if (response.status === 503) {
+          setCameraMessage("Gemini 서버 사용량이 많습니다. 잠시 후 다시 시도해주세요.");
+          return;
+        }
+
+        if (response.status === 429) {
+          setCameraMessage("AI 사용량 제한에 도달했습니다. 잠시 후 다시 시도해주세요.");
+          return;
+        }
+
         setCameraMessage(
           `사진 분석 오류 (${response.status}): ${data?.error || "알 수 없는 오류"}${data?.detail ? ` / ${data.detail}` : ""}`
         );
@@ -760,6 +844,7 @@ export default function App() {
     setCameraMessage("");
     setOcrPreviewRolls([]);
     setOcrRawText("");
+    setGeminiPreviewFrames([]);
   };
 
   const addRoll = (pins) => {
@@ -985,20 +1070,10 @@ export default function App() {
               .filter((pins) => {
                 if (pins !== 10) return true;
                 if (next?.canStrike) return true;
-
-                if (next?.rollInFrame === 2) {
-                  const currentFrameStart = getCurrentFrameStartIndex(rolls, next.frame);
-                  return rolls[currentFrameStart] === 0;
-                }
-
-                return false;
+                return isGutterSpareAvailable(next, rolls);
               })
               .map((pins) => {
-                const isGutterSpareButton = (() => {
-                  if (!next || pins !== 10 || next.rollInFrame !== 2) return false;
-                  const currentFrameStart = getCurrentFrameStartIndex(rolls, next.frame);
-                  return rolls[currentFrameStart] === 0;
-                })();
+                const isGutterSpareButton = pins === 10 && isGutterSpareAvailable(next, rolls);
 
                 return (
                   <button
