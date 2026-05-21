@@ -891,12 +891,13 @@ export default function App() {
       }
 
       const frameBasedRolls = normalizeGeminiRollsFromFrames(data.frames, data.rolls);
-      const repconst repairedRolls = repairTenthFrameRolls(
+      const repairedRolls = repairTenthFrameRolls(
         frameBasedRolls,
         data.frames,
         data.finalScore,
         data.cumulativeScores
-      );nst previewFrames = Array.isArray(data.frames) && data.frames.length > 0
+      );
+      const previewFrames = Array.isArray(data.frames) && data.frames.length > 0
         ? data.frames
         : calcBowlingScore(repairedRolls).frames;
 
@@ -1203,7 +1204,7 @@ export default function App() {
                       <div className="geminiScoreFrame" key={frame.frame}>
                         <div className="geminiScoreFrameNo">{frame.frame}</div>
                         <div className="geminiScoreFrameMark">
-                          {renderFrameMark(getPreviewFrameMark(frame))}
+                          {renderFrameMark(getPreview(frame))}
                         </div>
                       </div>
                     ))}
@@ -1321,4 +1322,6 @@ export default function App() {
           )}
         </section>
       </section>
- 
+    </main>
+  );
+}
