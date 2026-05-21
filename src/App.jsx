@@ -422,14 +422,60 @@ function normalizeGeminiRollsFromFrames(frames, fallbackRolls = []) {
   return rebuilt.length > 0 ? rebuilt.slice(0, 21) : fallbackRolls;
 }
 
-function repairTenthFrameRolls(rolls, frames = []) {
-  const repaired = [...rolls];
+function isCompleteGameRolls(rolls) {
+  return getFrameRollLimit(rolls) === null;
+}
+
+function findCompletedRollsByFinalScore(rolls, finalScore) {
+  const targetScore = Number(finalScore);
+  if (!Number.isFinite(targetScore) || targetScore <= 0) return rolls;
+  if (isCompleteGameRolls(rolls)) return rolls;
+
+  const queue = [rolls];
+  const visited = new Set([rolls.join(",")]);
+
+  while (queue.length > 0) {
+    const current = queue.shift();
+    const nextLimit = getFrameRollLimit(current);
+
+    if (!nextLimit) {
+      const score = calcBowlingScore(current).total;
+      if (score === targetScore) return current;
+      continue;
+    }
+
+    if (nextLimit.frame !== 10) continue;
+
+    for (let pins = 0; pins <= nextLimit.max; pins++) {
+      const candidate = [...current, pins];
+      const key = candidate.join(",");
+      if (visited.has(key)) continue;
+
+      visited.add(key);
+      queue.push(candidate);
+    }
+  }
+
+  return rolls;
+}
+
+function repairTenthFrameRolls(rolls, frames = [], finalScore = 0, cumulativeScores = []) {
+  let repaired = [...rolls];
   const tenthStart = getCurrentFrameStartIndex(repaired, 10);
   const tenthRolls = repaired.slice(tenthStart);
   const tenthFrame = Array.isArray(frames)
     ? frames.find((frame) => Number(frame.frame) === 10)
     : null;
   const tenthMark = String(tenthFrame?.mark || "").toUpperCase();
+  const normalizedFinalScore = Number(finalScore || cumulativeScores?.[cumulativeScores.length - 1] || 0);
+
+  if (tenthRolls.length === 1 && tenthRolls[0] === 10) {
+    const xCount = (tenthMark.match(/X/g) || []).length;
+
+    if (xCount >= 3) {
+      repaired.push(10, 10);
+    }
+  }
 
   if (tenthRolls.length === 2 && tenthRolls[0] === 10) {
     const xCount = (tenthMark.match(/X/g) || []).length;
@@ -439,10 +485,12 @@ function repairTenthFrameRolls(rolls, frames = []) {
     }
   }
 
+  repaired = findCompletedRollsByFinalScore(repaired, normalizedFinalScore);
+
   return repaired.slice(0, 21);
 }
 
-function getPreviewFrameMark(frame) {
+function getPreview(frame) {
   const parsedRolls = parseGeminiFrameRolls(frame);
 
   if (parsedRolls.length > 0) {
@@ -843,8 +891,12 @@ export default function App() {
       }
 
       const frameBasedRolls = normalizeGeminiRollsFromFrames(data.frames, data.rolls);
-      const repairedRolls = repairTenthFrameRolls(frameBasedRolls, data.frames);
-      const previewFrames = Array.isArray(data.frames) && data.frames.length > 0
+      const repconst repairedRolls = repairTenthFrameRolls(
+        frameBasedRolls,
+        data.frames,
+        data.finalScore,
+        data.cumulativeScores
+      );nst previewFrames = Array.isArray(data.frames) && data.frames.length > 0
         ? data.frames
         : calcBowlingScore(repairedRolls).frames;
 
@@ -1269,6 +1321,4 @@ export default function App() {
           )}
         </section>
       </section>
-    </main>
-  );
-}
+ 
