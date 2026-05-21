@@ -1156,7 +1156,6 @@ export default function App() {
                       </div>
                     ))}
                   </div>
-                  <small>분석 메모: {ocrRawText || "없음"}</small>
                 </div>
               )}
 
