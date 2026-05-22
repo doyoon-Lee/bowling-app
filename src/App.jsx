@@ -1,603 +1,31 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import "./App.css";
 
-let supabase = null;
-
-async function getSupabaseClient() {
-  if (supabase) return supabase;
-
-  const url = import.meta.env.VITE_SUPABASE_URL;
-  const anonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
-
-  if (!url || !anonKey) return null;
-
-  const { createClient } = await import("@supabase/supabase-js");
-  supabase = createClient(url, anonKey);
-  return supabase;
-}
-
-const APP_LOGGED_OUT_KEY = "bowling_app_logged_out";
-const keypadNumbers = [1, 2, 3, 4, 5, 6, 7, 8, 9, 0, 10];
-const allPins = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10];
-
-function formatRollMark(value) {
-  if (value === undefined || value === null) return "";
-  if (value === 10) return "X";
-  if (value === 0) return "-";
-  return String(value);
-}
-
-function formatFrameMark(first, second, third, frame) {
-  if (first === undefined) return "";
-
-  if (frame < 10) {
-    if (first === 10) return "X";
-    if (second === undefined) return `${formatRollMark(first)} |`;
-    if (first + second === 10) return `${formatRollMark(first)} | /`;
-    return `${formatRollMark(first)} | ${formatRollMark(second)}`;
-  }
-
-  const firstMark = formatRollMark(first);
-  let secondMark = "";
-  let thirdMark = "";
-
-  if (second !== undefined) {
-    if (first !== 10 && first + second === 10) secondMark = "/";
-    else secondMark = formatRollMark(second);
-  }
-
-  if (third !== undefined) {
-    if (first === 10 && second !== 10 && second + third === 10) thirdMark = "/";
-    else thirdMark = formatRollMark(third);
-  }
-
-  return [firstMark, secondMark, thirdMark].filter(Boolean).join(" | ");
-}
-
-function calcBowlingScore(rolls) {
-  let score = 0;
-  let rollIndex = 0;
-  const frames = [];
-
-  for (let frame = 1; frame <= 10; frame++) {
-    const first = rolls[rollIndex];
-    const second = rolls[rollIndex + 1];
-
-    if (frame < 10) {
-      if (first === undefined) {
-        frames.push({ frame, mark: "", total: "" });
-        continue;
-      }
-
-      if (first === 10) {
-        const bonus1 = rolls[rollIndex + 1];
-        const bonus2 = rolls[rollIndex + 2];
-        const canCalculate = bonus1 !== undefined && bonus2 !== undefined;
-        if (canCalculate) score += 10 + bonus1 + bonus2;
-        frames.push({ frame, mark: "X", total: canCalculate ? score : "" });
-        rollIndex += 1;
-        continue;
-      }
-
-      if (second === undefined) {
-        frames.push({ frame, mark: formatFrameMark(first, undefined, undefined, frame), total: "" });
-        rollIndex += 2;
-        continue;
-      }
-
-      if (first + second === 10) {
-        const bonus = rolls[rollIndex + 2];
-        const canCalculate = bonus !== undefined;
-        if (canCalculate) score += 10 + bonus;
-        frames.push({ frame, mark: formatFrameMark(first, second, undefined, frame), total: canCalculate ? score : "" });
-      } else {
-        score += first + second;
-        frames.push({ frame, mark: formatFrameMark(first, second, undefined, frame), total: score });
-      }
-
-      rollIndex += 2;
-      continue;
-    }
-
-    const tenthRolls = rolls.slice(rollIndex);
-    if (tenthRolls.length === 0) {
-      frames.push({ frame, mark: "", total: "" });
-      continue;
-    }
-
-    const [a, b, c] = tenthRolls;
-    const tenthMark = formatFrameMark(a, b, c, frame);
-    const tenthComplete = tenthRolls.length === 3 || (tenthRolls.length === 2 && a !== 10 && a + b < 10);
-
-    if (tenthComplete) {
-      score += tenthRolls.reduce((sum, roll) => sum + Number(roll ?? 0), 0);
-    }
-
-    frames.push({ frame, mark: tenthMark, total: tenthComplete ? score : "" });
-  }
-
-  const visibleTotal = [...frames].reverse().find((frame) => frame.total !== "")?.total || 0;
-  return { total: visibleTotal, frames };
-}
-
-function calcMaxPossibleScore(rolls) {
-  const next = getFrameRollLimit(rolls);
-  if (!next) return calcBowlingScore(rolls).total;
-
-  const simulated = [...rolls];
-  let guard = 0;
-
-  while (getFrameRollLimit(simulated) && guard < 25) {
-    const limit = getFrameRollLimit(simulated);
-    simulated.push(limit.max);
-    guard += 1;
-  }
-
-  return calcBowlingScore(simulated).total;
-}
-
-function getFrameRollLimit(rolls) {
-  let rollIndex = 0;
-
-  for (let frame = 1; frame <= 9; frame++) {
-    const first = rolls[rollIndex];
-    if (first === undefined) return { frame, rollInFrame: 1, max: 10, canStrike: true };
-
-    if (first === 10) {
-      rollIndex += 1;
-      continue;
-    }
-
-    const second = rolls[rollIndex + 1];
-    if (second === undefined) return { frame, rollInFrame: 2, max: 10 - first, canStrike: false };
-
-    rollIndex += 2;
-  }
-
-  const tenth = rolls.slice(rollIndex);
-
-  if (tenth.length === 0) return { frame: 10, rollInFrame: 1, max: 10, canStrike: true };
-
-  if (tenth.length === 1) {
-    return {
-      frame: 10,
-      rollInFrame: 2,
-      max: tenth[0] === 10 ? 10 : 10 - tenth[0],
-      canStrike: tenth[0] === 10,
-    };
-  }
-
-  if (tenth.length === 2) {
-    const [a, b] = tenth;
-
-    if (a === 10) {
-      if (b === 10) return { frame: 10, rollInFrame: 3, max: 10, canStrike: true };
-      return { frame: 10, rollInFrame: 3, max: 10 - b, canStrike: false };
-    }
-
-    if (a + b === 10) return { frame: 10, rollInFrame: 3, max: 10, canStrike: true };
-
-    return null;
-  }
-
-  return null;
-}
-
-function getCurrentFrameStartIndex(rolls, frame) {
-  let idx = 0;
-
-  for (let f = 1; f < frame; f++) {
-    if (rolls[idx] === 10 && f < 10) idx += 1;
-    else idx += 2;
-  }
-
-  return idx;
-}
-
-function formatPinButton(pins, next, rolls) {
-  if (!next) return String(pins);
-
-  const currentFrameStart = getCurrentFrameStartIndex(rolls, next.frame);
-  const firstRoll = rolls[currentFrameStart];
-  const secondRoll = rolls[currentFrameStart + 1];
-  const isTenthFrame = next.frame === 10;
-
-  if (pins === 10 && next.canStrike) return "X";
-
-  if (next.rollInFrame === 2) {
-    if (isTenthFrame && firstRoll === 10) {
-      if (pins === 0) return "-";
-      return String(pins);
-    }
-
-    if (firstRoll !== undefined) {
-      const spareValue = 10 - firstRoll;
-      if (pins === spareValue) return "/";
-      if (pins === 0) return "-";
-    }
-  }
-
-  if (isTenthFrame && next.rollInFrame === 3) {
-    if (firstRoll === 10 && secondRoll !== 10) {
-      const spareValue = 10 - secondRoll;
-      if (pins === spareValue) return "/";
-    }
-
-    if (pins === 0) return "-";
-  }
-
-  if (pins === 0) return "-";
-  return String(pins);
-}
-
-function renderFrameMark(mark) {
-  if (!mark) return <span className="markEmpty">&nbsp;</span>;
-
-  const parts = String(mark)
-    .split("|")
-    .map((part) => part.trim())
-    .filter((part) => part.length > 0);
-
-  if (parts.length === 1) return <span className="markPart single">{parts[0]}</span>;
-
-  return parts.map((part, index) => (
-    <React.Fragment key={`${part}-${index}`}>
-      <span className="markPart">{part}</span>
-      {index < parts.length - 1 && <span className="markDivider">|</span>}
-    </React.Fragment>
-  ));
-}
-
-function displayTotal(total) {
-  return total === "" || total === undefined || total === null ? " " : total;
-}
-
-function getKoreaDateKey(dateValue) {
-  return new Intl.DateTimeFormat("sv-SE", {
-    timeZone: "Asia/Seoul",
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
-  }).format(new Date(dateValue));
-}
-
-function getKoreaDateLabel(dateKey) {
-  const [year, month, day] = dateKey.split("-");
-  return `${year}.${month}.${day}`;
-}
-
-function groupRecordsByDate(records) {
-  return records.reduce((groups, record) => {
-    const dateKey = getKoreaDateKey(record.created_at);
-    if (!groups[dateKey]) groups[dateKey] = [];
-    groups[dateKey].push(record);
-    return groups;
-  }, {});
-}
-
-function getDayAverage(records) {
-  if (!records.length) return 0;
-  const total = records.reduce((sum, record) => sum + Number(record.total || 0), 0);
-  return Math.round(total / records.length);
-}
-
-function getDayHigh(records) {
-  if (!records.length) return 0;
-  return Math.max(...records.map((record) => Number(record.total || 0)));
-}
-
-function getDisplayUserName(user) {
-  return (
-    user?.user_metadata?.guest_name ||
-    user?.email ||
-    user?.user_metadata?.email ||
-    user?.user_metadata?.full_name ||
-    user?.user_metadata?.name ||
-    user?.user_metadata?.nickname ||
-    "로그인 사용자"
-  );
-}
-
-function createGuestName() {
-  const randomNumber = Math.floor(10000 + Math.random() * 90000);
-  return `Guest_${randomNumber}`;
-}
-
-function isGuestUser(user) {
-  return Boolean(user?.is_anonymous || user?.user_metadata?.guest_name);
-}
-
-function isInAppBrowser() {
-  const ua = navigator.userAgent.toLowerCase();
-
-  return (
-    ua.includes("naver") ||
-    ua.includes("kakaotalk") ||
-    ua.includes("instagram") ||
-    ua.includes("fbav") ||
-    ua.includes("line")
-  );
-}
-
-function openCurrentPageInExternalBrowser() {
-  const currentUrl = window.location.href;
-  const urlWithoutProtocol = currentUrl.replace(/^https?:\/\//, "");
-  const ua = navigator.userAgent.toLowerCase();
-
-  if (/android/i.test(ua)) {
-    window.location.href = `intent://${urlWithoutProtocol}#Intent;scheme=https;package=com.android.chrome;end`;
-    return;
-  }
-
-  window.location.href = currentUrl;
-}
-
-function parseGeminiFrameRolls(frame) {
-  const frameNo = Number(frame?.frame);
-
-  const mark = String(frame?.mark || "")
-    .toUpperCase()
-    .replace(/[×✕＊*]/g, "X")
-    .replace(/[／]/g, "/")
-    .replace(/[–—_]/g, "-")
-    .replace(/\s+/g, "")
-    .trim();
-
-  const fallback = Array.isArray(frame?.rolls)
-    ? frame.rolls
-        .map((roll) => Number(roll))
-        .filter((roll) => Number.isInteger(roll) && roll >= 0 && roll <= 10)
-    : [];
-
-  if (!frameNo || !mark) return fallback;
-
-  if (frameNo < 10) {
-    if (mark.includes("X")) return [10];
-
-    if (mark.includes("/")) {
-      const firstToken = mark.match(/[0-9-]/)?.[0];
-      const first = firstToken === "-" ? 0 : Number(firstToken);
-
-      if (Number.isInteger(first) && first >= 0 && first <= 9) {
-        return [first, 10 - first];
-      }
-    }
-
-    const digits = mark.match(/[0-9-]/g) || [];
-
-    if (digits.length >= 2) {
-      const first = digits[0] === "-" ? 0 : Number(digits[0]);
-      const second = digits[1] === "-" ? 0 : Number(digits[1]);
-
-      if (
-        Number.isInteger(first) &&
-        Number.isInteger(second) &&
-        first >= 0 &&
-        second >= 0 &&
-        first + second <= 10
-      ) {
-        return [first, second];
-      }
-    }
-
-    return fallback;
-  }
-
-  const tokens = mark.match(/X|\/|[0-9-]/g) || [];
-  const rolls = [];
-
-  tokens.forEach((token) => {
-    if (token === "X") {
-      rolls.push(10);
-      return;
-    }
-
-    if (token === "-") {
-      rolls.push(0);
-      return;
-    }
-
-    if (token === "/") {
-      const prev = rolls[rolls.length - 1];
-      if (Number.isInteger(prev)) rolls.push(10 - prev);
-      return;
-    }
-
-    const value = Number(token);
-    if (Number.isInteger(value) && value >= 0 && value <= 10) {
-      rolls.push(value);
-    }
-  });
-
-  return rolls.length > 0 ? rolls.slice(0, 3) : fallback.slice(0, 3);
-}
-
-function normalizeGeminiRollsFromFrames(frames, fallbackRolls = []) {
-  if (!Array.isArray(frames) || frames.length === 0) return fallbackRolls;
-
-  const rebuilt = [];
-
-  frames
-    .slice()
-    .sort((a, b) => Number(a.frame || 0) - Number(b.frame || 0))
-    .forEach((frame) => {
-      const frameRolls = parseGeminiFrameRolls(frame);
-      frameRolls.forEach((roll) => rebuilt.push(roll));
-    });
-
-  return rebuilt.length > 0 ? rebuilt.slice(0, 21) : fallbackRolls;
-}
-
-function isCompleteGameRolls(rolls) {
-  return getFrameRollLimit(rolls) === null;
-}
-
-function findCompletedRollsByFinalScore(rolls, finalScore) {
-  const targetScore = Number(finalScore);
-  if (!Number.isFinite(targetScore) || targetScore <= 0) return rolls;
-  if (isCompleteGameRolls(rolls)) return rolls;
-
-  const queue = [rolls];
-  const visited = new Set([rolls.join(",")]);
-
-  while (queue.length > 0) {
-    const current = queue.shift();
-    const nextLimit = getFrameRollLimit(current);
-
-    if (!nextLimit) {
-      const score = calcBowlingScore(current).total;
-      if (score === targetScore) return current;
-      continue;
-    }
-
-    if (nextLimit.frame !== 10) continue;
-
-    for (let pins = 0; pins <= nextLimit.max; pins++) {
-      const candidate = [...current, pins];
-      const key = candidate.join(",");
-      if (visited.has(key)) continue;
-
-      visited.add(key);
-      queue.push(candidate);
-    }
-  }
-
-  return rolls;
-}
-
-function repairTenthFrameRolls(rolls, frames = [], finalScore = 0, cumulativeScores = []) {
-  let repaired = [...rolls];
-  const tenthStart = getCurrentFrameStartIndex(repaired, 10);
-  const tenthRolls = repaired.slice(tenthStart);
-  const tenthFrame = Array.isArray(frames)
-    ? frames.find((frame) => Number(frame.frame) === 10)
-    : null;
-  const tenthMark = String(tenthFrame?.mark || "").toUpperCase();
-  const normalizedFinalScore = Number(finalScore || cumulativeScores?.[cumulativeScores.length - 1] || 0);
-
-  if (tenthRolls.length === 1 && tenthRolls[0] === 10) {
-    const xCount = (tenthMark.match(/X/g) || []).length;
-
-    if (xCount >= 3) {
-      repaired.push(10, 10);
-    }
-  }
-
-  if (tenthRolls.length === 2 && tenthRolls[0] === 10) {
-    const xCount = (tenthMark.match(/X/g) || []).length;
-
-    if (xCount >= 3) {
-      repaired.push(10);
-    }
-  }
-
-  repaired = findCompletedRollsByFinalScore(repaired, normalizedFinalScore);
-
-  return repaired.slice(0, 21);
-}
-
-function getPreview(frame) {
-  const parsedRolls = parseGeminiFrameRolls(frame);
-
-  if (parsedRolls.length > 0) {
-    const [first, second, third] = parsedRolls;
-    return formatFrameMark(first, second, third, Number(frame.frame));
-  }
-
-  const rawMark = String(frame?.mark || "").trim();
-
-  if (Number(frame?.frame) < 10 && /^[0-9][0-9]$/.test(rawMark)) {
-    return rawMark[0] + " | " + rawMark[1];
-  }
-
-  return rawMark;
-}
-
-function isGutterSpareAvailable(next, rolls) {
-  if (!next || next.frame >= 10 || next.rollInFrame !== 2) return false;
-
-  const currentFrameStart = getCurrentFrameStartIndex(rolls, next.frame);
-  return rolls[currentFrameStart] === 0;
-}
-
-function isTenthFrameGutterSpareAvailable(next, rolls) {
-  if (!next || next.frame !== 10 || next.rollInFrame !== 3) return false;
-
-  const tenthStart = getCurrentFrameStartIndex(rolls, 10);
-  const firstRoll = rolls[tenthStart];
-  const secondRoll = rolls[tenthStart + 1];
-
-  return firstRoll === 10 && secondRoll === 0;
-}
-
-function getProStepLabel(next) {
-  if (!next) return "게임 완료";
-  if (next.rollInFrame === 1) return `${next.frame}F 초구`;
-  if (next.rollInFrame === 2) return `${next.frame}F 후구`;
-  return `${next.frame}F 보너스`;
-}
-
-function getPinsDownCount(selectedPins) {
-  return selectedPins.length;
-}
-
-function getPinsLeftCount(selectedPins) {
-  return 10 - selectedPins.length;
-}
-
-function getPinDeckHint(next) {
-  if (!next) return "게임이 완료되었습니다.";
-  if (next.rollInFrame === 1) return "초구에 쓰러진 핀을 선택하세요.";
-  if (next.rollInFrame === 2) return "남은 핀 중 후구에 처리한 핀을 선택하세요.";
-  return "10프레임 보너스 투구 결과를 선택하세요.";
-}
-
-function PinDeck({ selectedPins, allowedPins, onTogglePin, disabled }) {
-  const layout = [
-    { pin: 7, className: "pinDeckPin p7" },
-    { pin: 8, className: "pinDeckPin p8" },
-    { pin: 9, className: "pinDeckPin p9" },
-    { pin: 10, className: "pinDeckPin p10" },
-    { pin: 4, className: "pinDeckPin p4" },
-    { pin: 5, className: "pinDeckPin p5" },
-    { pin: 6, className: "pinDeckPin p6" },
-    { pin: 2, className: "pinDeckPin p2" },
-    { pin: 3, className: "pinDeckPin p3" },
-    { pin: 1, className: "pinDeckPin p1" },
-  ];
-
-  return (
-    <div className="pinDeck">
-      {layout.map(({ pin, className }) => {
-        const isSelected = selectedPins.includes(pin);
-        const isAllowed = allowedPins.includes(pin);
-
-        return (
-          <button
-            key={pin}
-            type="button"
-            className={`${className} ${isSelected ? "selected" : ""} ${!isAllowed ? "disabled" : ""}`}
-            disabled={disabled || !isAllowed}
-            onClick={() => onTogglePin(pin)}
-          >
-            {pin}
-          </button>
-        );
-      })}
-    </div>
-  );
-}
+import AuthScreen from "./components/AuthScreen";
+import BeginnerKeypad from "./components/BeginnerKeypad";
+import History from "./components/History";
+import OCRModal from "./components/OCRModal";
+import PlaceModal from "./components/PlaceModal";
+import ProMode from "./components/ProMode";
+import Scoreboard from "./components/Scoreboard";
+
+import { APP_LOGGED_OUT_KEY, createGuestName, getDisplayUserName, isGuestUser, isInAppBrowser, openCurrentPageInExternalBrowser } from "./utils/auth";
+import { calcBowlingScore, calcMaxPossibleScore, getFrameRollLimit, normalizeGeminiRollsFromFrames, repairTenthFrameRolls } from "./utils/bowling";
+import { groupRecordsByDate } from "./utils/date";
+import { getCachedSupabaseClient, getSupabaseClient } from "./utils/supabaseClient";
 
 export default function App() {
   const [session, setSession] = useState(null);
   const [authLoading, setAuthLoading] = useState(true);
   const [scoreMode, setScoreMode] = useState("beginner");
+
   const [playerName, setPlayerName] = useState("");
   const [place, setPlace] = useState("");
   const [placeCandidates, setPlaceCandidates] = useState([]);
   const [isPlaceModalOpen, setIsPlaceModalOpen] = useState(false);
   const [isSearchingPlace, setIsSearchingPlace] = useState(false);
   const [placeSearchMessage, setPlaceSearchMessage] = useState("");
+
   const [scoreImage, setScoreImage] = useState(null);
   const [isCameraModalOpen, setIsCameraModalOpen] = useState(false);
   const [isAnalyzingScoreImage, setIsAnalyzingScoreImage] = useState(false);
@@ -606,23 +34,20 @@ export default function App() {
   const [ocrRawText, setOcrRawText] = useState("");
   const [geminiPreviewFrames, setGeminiPreviewFrames] = useState([]);
   const [analysisAttempt, setAnalysisAttempt] = useState(0);
+
   const [rolls, setRolls] = useState([]);
+  const [pinFrames, setPinFrames] = useState([]);
   const [records, setRecords] = useState([]);
   const [isSaving, setIsSaving] = useState(false);
-  const [proFirstRollPins, setProFirstRollPins] = useState([]);
-  const [proCurrentSelectedPins, setProCurrentSelectedPins] = useState([]);
-  const [proPinHistory, setProPinHistory] = useState([]);
-  const scoreboardRef = useRef(null);
 
+  const scoreboardRef = useRef(null);
   const user = session?.user;
+
   const result = useMemo(() => calcBowlingScore(rolls), [rolls]);
   const maxPossible = useMemo(() => calcMaxPossibleScore(rolls), [rolls]);
   const groupedRecords = useMemo(() => groupRecordsByDate(records), [records]);
   const sortedDateKeys = useMemo(() => Object.keys(groupedRecords).sort((a, b) => b.localeCompare(a)), [groupedRecords]);
   const next = getFrameRollLimit(rolls);
-  const remainingPinsAfterFirst = allPins.filter((pin) => !proFirstRollPins.includes(pin));
-  const allowedProPins = next?.rollInFrame === 2 && next.frame < 10 ? remainingPinsAfterFirst : allPins;
-  const proCanSubmit = next && proCurrentSelectedPins.length <= next.max;
 
   useEffect(() => {
     if (!scoreboardRef.current || !next) return;
@@ -741,7 +166,8 @@ export default function App() {
 
     return () => {
       mounted = false;
-      if (channel && supabase) supabase.removeChannel(channel);
+      const cached = getCachedSupabaseClient();
+      if (channel && cached) cached.removeChannel(channel);
     };
   }, [user]);
 
@@ -797,16 +223,10 @@ export default function App() {
     const guestName = createGuestName();
 
     const { error } = await client.auth.signInAnonymously({
-      options: {
-        data: {
-          guest_name: guestName,
-        },
-      },
+      options: { data: { guest_name: guestName } },
     });
 
-    if (error) {
-      alert(`게스트 로그인 실패: ${error.message}`);
-    }
+    if (error) alert(`게스트 로그인 실패: ${error.message}`);
   };
 
   const signOut = async () => {
@@ -818,6 +238,7 @@ export default function App() {
       setSession(null);
       setRecords([]);
       setRolls([]);
+      setPinFrames([]);
       setPlayerName("");
       return;
     }
@@ -826,6 +247,7 @@ export default function App() {
     await client.auth.signOut();
     setRecords([]);
     setRolls([]);
+    setPinFrames([]);
     setPlayerName("");
   };
 
@@ -1043,59 +465,11 @@ export default function App() {
 
   const undo = () => {
     setRolls((prev) => prev.slice(0, -1));
-    setProCurrentSelectedPins([]);
-    setProFirstRollPins([]);
   };
 
   const reset = () => {
     setRolls([]);
-    setProCurrentSelectedPins([]);
-    setProFirstRollPins([]);
-    setProPinHistory([]);
-  };
-
-  const toggleProPin = (pin) => {
-    if (!next) return;
-    if (!allowedProPins.includes(pin)) return;
-
-    setProCurrentSelectedPins((prev) =>
-      prev.includes(pin) ? prev.filter((item) => item !== pin) : [...prev, pin].sort((a, b) => a - b)
-    );
-  };
-
-  const submitProRoll = () => {
-    if (!next || proCurrentSelectedPins.length > next.max) return;
-
-    const pinsDown = getPinsDownCount(proCurrentSelectedPins);
-    const pinsLeft = getPinsLeftCount(proCurrentSelectedPins);
-
-    setProPinHistory((prev) => [
-      ...prev,
-      {
-        frame: next.frame,
-        rollInFrame: next.rollInFrame,
-        pins: proCurrentSelectedPins,
-        pinsDown,
-        pinsLeft,
-      },
-    ]);
-
-    if (next.frame < 10 && next.rollInFrame === 1 && pinsDown < 10) {
-      setProFirstRollPins(proCurrentSelectedPins);
-    } else {
-      setProFirstRollPins([]);
-    }
-
-    setRolls((prev) => [...prev, pinsDown]);
-    setProCurrentSelectedPins([]);
-  };
-
-  const proQuickStrike = () => {
-    setProCurrentSelectedPins(allPins);
-  };
-
-  const proQuickGutter = () => {
-    setProCurrentSelectedPins([]);
+    setPinFrames([]);
   };
 
   const saveGame = async () => {
@@ -1131,8 +505,6 @@ export default function App() {
       total: result.total,
       rolls,
       frames: result.frames,
-      mode: scoreMode,
-      pin_history: proPinHistory,
     };
 
     const { data: savedRecord, error } = await client
@@ -1157,9 +529,7 @@ export default function App() {
     }
 
     setRolls([]);
-    setProCurrentSelectedPins([]);
-    setProFirstRollPins([]);
-    setProPinHistory([]);
+    setPinFrames([]);
   };
 
   const deleteRecord = async (id) => {
@@ -1182,74 +552,15 @@ export default function App() {
     setRecords((prev) => prev.filter((record) => record.id !== id));
   };
 
-  if (authLoading) {
+  if (authLoading || !session) {
     return (
-      <main className="app authPage">
-        <section className="authContainer">
-          <div className="loginCard loadingCard">
-            <div className="logoBadge">🎳</div>
-            <h1>Bowling Score</h1>
-            <p>로그인 상태를 확인하는 중입니다...</p>
-          </div>
-        </section>
-      </main>
-    );
-  }
-
-  if (!session) {
-    const inAppBrowser = isInAppBrowser();
-
-    return (
-      <main className="app authPage">
-        <section className="authContainer">
-          <div className="loginCard">
-            <div className="logoBadge">🎳</div>
-            <h1>Bowling Score</h1>
-            <p className="loginSubtitle">개인 볼링 기록을 날짜별로 저장하고 점수 변화를 확인하세요.</p>
-
-            <div className="loginFeatureGrid">
-              <div>
-                <strong>개인 기록</strong>
-                <span>계정별 점수 저장</span>
-              </div>
-              <div>
-                <strong>날짜별 관리</strong>
-                <span>일자별 평균/최고점</span>
-              </div>
-            </div>
-
-            {inAppBrowser && (
-              <div className="browserNotice">
-                <strong>외부 브라우저가 필요합니다.</strong>
-                <span>네이버/카카오 앱 내부 브라우저에서는 Google 로그인이 차단될 수 있습니다. Kakao 로그인 또는 Chrome 열기를 사용하세요.</span>
-              </div>
-            )}
-
-            <div className="loginButtonGroup">
-              <button className="googleLoginButton" onClick={signInWithGoogle}>
-                <span className="loginButtonInner">
-                  <img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" alt="Google" />
-                  <span>{inAppBrowser ? "Chrome으로 열기" : "Google 계정으로 로그인"}</span>
-                </span>
-              </button>
-
-              <button className="kakaoLoginButton" onClick={signInWithKakao}>
-                <span className="loginButtonInner">
-                  <span className="kakaoLogoText">K</span>
-                  <span>Kakao 계정으로 로그인</span>
-                </span>
-              </button>
-
-              <button className="guestLoginButton" onClick={signInAsGuest}>
-                <span className="loginButtonInner">
-                  <span className="guestLogoText">G</span>
-                  <span>게스트로 시작하기</span>
-                </span>
-              </button>
-            </div>
-          </div>
-        </section>
-      </main>
+      <AuthScreen
+        authLoading={authLoading}
+        inAppBrowser={isInAppBrowser()}
+        onGoogleLogin={signInWithGoogle}
+        onKakaoLogin={signInWithKakao}
+        onGuestLogin={signInAsGuest}
+      />
     );
   }
 
@@ -1311,102 +622,22 @@ export default function App() {
             </div>
           </div>
 
-          <div className="laneScoreboard" ref={scoreboardRef}>
-            {Array.from({ length: 10 }, (_, i) => {
-              const frame = result.frames[i];
-              return (
-                <div className="frameBox" key={i}>
-                  <div className="frameNo">{i + 1}</div>
-                  <div className="frameMark">{renderFrameMark(frame?.mark)}</div>
-                  <div className="frameTotal">{displayTotal(frame?.total)}</div>
-                </div>
-              );
-            })}
-          </div>
+          <Scoreboard result={result} scoreboardRef={scoreboardRef} />
 
           {scoreMode === "beginner" ? (
-            <>
-              <div className="scoreInputHeader">
-                <div className="keypadTitle">핀 수 입력</div>
-                <label className="cameraButton">
-                  📷 점수판 촬영
-                  <input type="file" accept="image/*" capture="environment" onChange={handleScoreImageChange} />
-                </label>
-              </div>
-
-              <div className="pinGrid keypad">
-                {keypadNumbers
-                  .filter((pins) => {
-                    if (pins !== 10) return true;
-                    if (next?.canStrike) return true;
-                    if (isGutterSpareAvailable(next, rolls)) return true;
-                    return isTenthFrameGutterSpareAvailable(next, rolls);
-                  })
-                  .map((pins) => {
-                    const isGutterSpareButton = pins === 10 && isGutterSpareAvailable(next, rolls);
-                    const isTenthGutterSpareButton = pins === 10 && isTenthFrameGutterSpareAvailable(next, rolls);
-
-                    return (
-                      <button
-                        key={pins}
-                        disabled={!next || pins > next.max || (pins === 10 && !next.canStrike && !isGutterSpareButton && !isTenthGutterSpareButton)}
-                        onClick={() => addRoll(pins)}
-                        className={pins === 10 && next?.canStrike ? "pin strike" : "pin"}
-                      >
-                        {formatPinButton(pins, next, rolls)}
-                      </button>
-                    );
-                  })}
-              </div>
-            </>
+            <BeginnerKeypad
+              next={next}
+              rolls={rolls}
+              onAddRoll={addRoll}
+              onCameraChange={handleScoreImageChange}
+            />
           ) : (
-            <section className="proPanel">
-              <div className="proHeader">
-                <div>
-                  <strong>{getProStepLabel(next)}</strong>
-                  <span>{getPinDeckHint(next)}</span>
-                </div>
-                <div className="proCountBadge">
-                  {proCurrentSelectedPins.length}/{next?.max ?? 0}
-                </div>
-              </div>
-
-              <PinDeck
-                selectedPins={proCurrentSelectedPins}
-                allowedPins={allowedProPins}
-                onTogglePin={toggleProPin}
-                disabled={!next}
-              />
-
-              <div className="proQuickActions">
-                <button type="button" onClick={proQuickStrike} disabled={!next || next.max < 10}>
-                  전체 처리
-                </button>
-                <button type="button" onClick={proQuickGutter} disabled={!next}>
-                  거터
-                </button>
-                <button type="button" onClick={() => setProCurrentSelectedPins([])} disabled={!next}>
-                  선택 해제
-                </button>
-              </div>
-
-              <div className="proSubmitBox">
-                <div>
-                  <span>선택 핀</span>
-                  <strong>{proCurrentSelectedPins.length ? proCurrentSelectedPins.join(", ") : "없음"}</strong>
-                </div>
-                <button type="button" onClick={submitProRoll} disabled={!proCanSubmit}>
-                  투구 입력
-                </button>
-              </div>
-
-              {next?.rollInFrame === 2 && next.frame < 10 && (
-                <div className="remainingPinsBox">
-                  <span>남은 핀</span>
-                  <strong>{remainingPinsAfterFirst.length ? remainingPinsAfterFirst.join(", ") : "없음"}</strong>
-                </div>
-              )}
-            </section>
+            <ProMode
+              next={next}
+              onAddRoll={addRoll}
+              pinFrames={pinFrames}
+              setPinFrames={setPinFrames}
+            />
           )}
 
           <div className="buttonGrid">
@@ -1419,147 +650,33 @@ export default function App() {
         </section>
 
         {isCameraModalOpen && (
-          <div className="placeModalBackdrop" onClick={() => setIsCameraModalOpen(false)}>
-            <div className="placeModal" onClick={(e) => e.stopPropagation()}>
-              <div className="placeModalHeader">
-                <div>
-                  <strong>점수판 사진 분석</strong>
-                  <span>볼링장 모니터를 정면으로 촬영해주세요.</span>
-                </div>
-                <button onClick={() => setIsCameraModalOpen(false)}>닫기</button>
-              </div>
-
-              {scoreImage && (
-                <img className="scoreImagePreview" src={URL.createObjectURL(scoreImage)} alt="점수판 미리보기" />
-              )}
-
-              {cameraMessage && <div className="placeMessage">{cameraMessage}</div>}
-
-              {ocrPreviewRolls.length > 0 && (
-                <div className="ocrPreviewBox">
-                  <strong>Gemini 분석 투구값</strong>
-                  <div className="geminiScoreboardPreview">
-                    {(geminiPreviewFrames.length > 0 ? geminiPreviewFrames : calcBowlingScore(ocrPreviewRolls).frames).map((frame) => (
-                      <div className="geminiScoreFrame" key={frame.frame}>
-                        <div className="geminiScoreFrameNo">{frame.frame}</div>
-                        <div className="geminiScoreFrameMark">
-                          {renderFrameMark(getPreview(frame))}
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
-
-              <button className="manualPlaceButton" onClick={analyzeScoreImage} disabled={isAnalyzingScoreImage}>
-                {isAnalyzingScoreImage ? "분석 중..." : ocrPreviewRolls.length > 0 ? "다시 분석하기" : "사진 분석하기"}
-              </button>
-
-              {ocrPreviewRolls.length > 0 && (
-                <button className="manualPlaceButton primaryModalButton" onClick={applyOcrPreview}>
-                  인식 결과 적용
-                </button>
-              )}
-
-              <p className="cameraGuide">
-                Gemini Vision으로 사진을 분석합니다. 결과가 다를 수 있으니 적용 전 투구값을 꼭 확인해주세요.
-              </p>
-            </div>
-          </div>
+          <OCRModal
+            scoreImage={scoreImage}
+            cameraMessage={cameraMessage}
+            ocrPreviewRolls={ocrPreviewRolls}
+            geminiPreviewFrames={geminiPreviewFrames}
+            isAnalyzingScoreImage={isAnalyzingScoreImage}
+            onClose={() => setIsCameraModalOpen(false)}
+            onAnalyze={analyzeScoreImage}
+            onApply={applyOcrPreview}
+          />
         )}
 
         {isPlaceModalOpen && (
-          <div className="placeModalBackdrop" onClick={() => setIsPlaceModalOpen(false)}>
-            <div className="placeModal" onClick={(e) => e.stopPropagation()}>
-              <div className="placeModalHeader">
-                <div>
-                  <strong>주변 볼링장</strong>
-                  <span>현재 위치 기준 최대 3개</span>
-                </div>
-                <button onClick={() => setIsPlaceModalOpen(false)}>닫기</button>
-              </div>
-
-              {isSearchingPlace && <div className="placeLoading">주변 볼링장을 검색 중입니다...</div>}
-              {!isSearchingPlace && placeSearchMessage && <div className="placeMessage">{placeSearchMessage}</div>}
-
-              {!isSearchingPlace && placeCandidates.length > 0 && (
-                <div className="placeList">
-                  {placeCandidates.map((candidate) => (
-                    <button key={candidate.id} onClick={() => selectBowlingPlace(candidate)}>
-                      <strong>{candidate.name}</strong>
-                      <span>{candidate.distance}</span>
-                      <em>{candidate.address}</em>
-                    </button>
-                  ))}
-                </div>
-              )}
-
-              <button className="manualPlaceButton" onClick={() => setIsPlaceModalOpen(false)}>
-                직접 입력하기
-              </button>
-            </div>
-          </div>
+          <PlaceModal
+            isSearchingPlace={isSearchingPlace}
+            placeSearchMessage={placeSearchMessage}
+            placeCandidates={placeCandidates}
+            onSelect={selectBowlingPlace}
+            onClose={() => setIsPlaceModalOpen(false)}
+          />
         )}
 
-        <section className="history">
-          <h2>날짜별 기록</h2>
-
-          {sortedDateKeys.length === 0 ? (
-            <div className="empty">저장된 기록이 없습니다.</div>
-          ) : (
-            sortedDateKeys.map((dateKey) => {
-              const dayRecords = groupedRecords[dateKey];
-              return (
-                <section className="dateGroup" key={dateKey}>
-                  <div className="dateHeader">
-                    <div>
-                      <strong>{getKoreaDateLabel(dateKey)}</strong>
-                      <span>{dayRecords.length}게임</span>
-                    </div>
-                    <div className="dateStats">
-                      <span>AVG {getDayAverage(dayRecords)}</span>
-                      <span>HIGH {getDayHigh(dayRecords)}</span>
-                    </div>
-                  </div>
-
-                  {dayRecords.map((record) => (
-                    <details className="record compactRecord" key={record.id}>
-                      <summary>
-                        <div>
-                          <strong>{record.total}점</strong>
-                          <p>{record.player_name} · {record.place || "장소 미입력"}</p>
-                        </div>
-                        <span>{new Date(record.created_at).toLocaleTimeString("ko-KR", { hour: "2-digit", minute: "2-digit" })}</span>
-                      </summary>
-
-                      <div className="recordDetail">
-                        <button
-                          type="button"
-                          onClick={(e) => {
-                            e.preventDefault();
-                            e.stopPropagation();
-                            deleteRecord(record.id);
-                          }}
-                        >
-                          삭제
-                        </button>
-                        <div className="recordFrames">
-                          {(record.frames || []).map((frame) => (
-                            <div className="recordFrame" key={frame.frame}>
-                              <span>{frame.frame}</span>
-                              <b>{renderFrameMark(frame.mark)}</b>
-                              <em>{displayTotal(frame.total)}</em>
-                            </div>
-                          ))}
-                        </div>
-                      </div>
-                    </details>
-                  ))}
-                </section>
-              );
-            })
-          )}
-        </section>
+        <History
+          sortedDateKeys={sortedDateKeys}
+          groupedRecords={groupedRecords}
+          onDeleteRecord={deleteRecord}
+        />
       </section>
     </main>
   );

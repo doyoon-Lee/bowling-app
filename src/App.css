@@ -244,28 +244,26 @@ input {
 .modeSwitch {
   display: grid;
   grid-template-columns: 1fr 1fr;
-  background: #f1f5f9;
-  border: 1px solid #dbeafe;
-  border-radius: 16px;
-  padding: 4px;
+  gap: 8px;
   margin-bottom: 10px;
-  gap: 4px;
+  padding: 4px;
+  border-radius: 999px;
+  background: #eff6ff;
 }
 
 .modeSwitch button {
   height: 38px;
   border: none;
-  border-radius: 12px;
+  border-radius: 999px;
   background: transparent;
   color: #64748b;
-  font-size: 13px;
   font-weight: 900;
 }
 
 .modeSwitch button.active {
-  background: white;
-  color: #0284c7;
-  box-shadow: 0 4px 14px rgba(15, 23, 42, 0.08);
+  background: #2563eb;
+  color: white;
+  box-shadow: 0 4px 12px rgba(37, 99, 235, 0.2);
 }
 
 .playerBar {
@@ -468,45 +466,45 @@ input {
 
 .proPanel {
   margin-top: 14px;
-  padding: 12px;
+  display: grid;
+  gap: 12px;
+}
+
+.proStepCard,
+.proStats {
   border: 1px solid #dbeafe;
   border-radius: 18px;
   background: #f8fafc;
+  padding: 12px;
 }
 
-.proHeader {
-  display: flex;
-  justify-content: space-between;
-  gap: 10px;
-  align-items: center;
-  margin-bottom: 12px;
-}
-
-.proHeader strong {
+.proStepCard strong,
+.proStatsHeader strong,
+.pinDeckHeader strong {
   display: block;
-  color: #0284c7;
-  font-size: 16px;
+  color: #0f172a;
+  font-size: 15px;
 }
 
-.proHeader span {
+.proStepCard p,
+.proStatsHeader span,
+.pinDeckHeader span {
   display: block;
-  margin-top: 3px;
+  margin: 4px 0 0;
   color: #64748b;
   font-size: 12px;
+  line-height: 1.4;
 }
 
-.proCountBadge {
-  min-width: 52px;
-  height: 34px;
-  border-radius: 999px;
+.pinDeckWrap {
+  border: 1px solid #dbeafe;
+  border-radius: 20px;
   background: white;
-  border: 1px solid #bfdbfe;
-  color: #0369a1;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 13px;
-  font-weight: 900;
+  padding: 14px;
+}
+
+.pinDeckHeader {
+  margin-bottom: 12px;
 }
 
 .pinDeck {
@@ -514,106 +512,126 @@ input {
   width: 260px;
   height: 230px;
   margin: 0 auto;
-  border-radius: 24px;
-  background: linear-gradient(180deg, #e0f2fe 0%, #f8fafc 100%);
-  border: 1px solid #bfdbfe;
 }
 
-.pinDeckPin {
+.deckPin {
   position: absolute;
-  width: 42px;
-  height: 42px;
-  border-radius: 999px;
+  width: 46px;
+  height: 46px;
+  border-radius: 50%;
   border: 2px solid #cbd5e1;
   background: white;
   color: #0f172a;
-  font-size: 15px;
   font-weight: 900;
-  box-shadow: 0 4px 12px rgba(15, 23, 42, 0.08);
+  box-shadow: 0 4px 10px rgba(15, 23, 42, 0.08);
 }
 
-.pinDeckPin.selected {
-  background: #2563eb;
-  color: white;
-  border-color: #2563eb;
+.deckPin.selected {
+  background: #facc15;
+  border-color: #eab308;
+  color: #111827;
 }
 
-.pinDeckPin.disabled {
+.deckPin:disabled {
   opacity: 0.25;
 }
 
-.pinDeckPin.p7 { left: 34px; top: 22px; }
-.pinDeckPin.p8 { left: 83px; top: 22px; }
-.pinDeckPin.p9 { left: 132px; top: 22px; }
-.pinDeckPin.p10 { left: 181px; top: 22px; }
-.pinDeckPin.p4 { left: 58px; top: 78px; }
-.pinDeckPin.p5 { left: 107px; top: 78px; }
-.pinDeckPin.p6 { left: 156px; top: 78px; }
-.pinDeckPin.p2 { left: 83px; top: 134px; }
-.pinDeckPin.p3 { left: 132px; top: 134px; }
-.pinDeckPin.p1 { left: 107px; top: 184px; }
+.p7 { left: 12px; top: 8px; }
+.p8 { left: 76px; top: 8px; }
+.p9 { left: 140px; top: 8px; }
+.p10 { left: 204px; top: 8px; }
+.p4 { left: 44px; top: 66px; }
+.p5 { left: 108px; top: 66px; }
+.p6 { left: 172px; top: 66px; }
+.p2 { left: 76px; top: 124px; }
+.p3 { left: 140px; top: 124px; }
+.p1 { left: 108px; top: 182px; }
 
-.proQuickActions {
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 8px;
-  margin-top: 12px;
-}
-
-.proQuickActions button,
-.proSubmitBox button {
-  height: 40px;
+.proPrimaryButton,
+.proSubButton {
+  height: 46px;
   border: none;
-  border-radius: 12px;
-  background: #e2e8f0;
-  color: #0f172a;
-  font-size: 13px;
-  font-weight: 800;
-}
-
-.proQuickActions button:disabled,
-.proSubmitBox button:disabled {
-  opacity: 0.4;
-}
-
-.proSubmitBox {
-  display: grid;
-  grid-template-columns: 1fr 110px;
-  gap: 8px;
-  margin-top: 10px;
-  align-items: stretch;
-}
-
-.proSubmitBox > div,
-.remainingPinsBox {
-  background: white;
-  border: 1px solid #dbeafe;
   border-radius: 14px;
-  padding: 9px 10px;
+  font-weight: 900;
 }
 
-.proSubmitBox span,
-.remainingPinsBox span {
-  display: block;
-  color: #64748b;
-  font-size: 11px;
-  margin-bottom: 3px;
-}
-
-.proSubmitBox strong,
-.remainingPinsBox strong {
-  display: block;
-  color: #0f172a;
-  font-size: 13px;
-}
-
-.proSubmitBox button {
+.proPrimaryButton {
   background: #2563eb;
   color: white;
 }
 
-.remainingPinsBox {
-  margin-top: 8px;
+.proSubButton {
+  background: #e2e8f0;
+  color: #0f172a;
+}
+
+.proActionRow {
+  display: grid;
+  grid-template-columns: 1fr 1.5fr;
+  gap: 8px;
+}
+
+.proStatsHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 12px;
+}
+
+.donutGrid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 12px;
+}
+
+.donutCard {
+  border-radius: 16px;
+  background: white;
+  border: 1px solid #e2e8f0;
+  padding: 12px;
+  text-align: center;
+}
+
+.donut {
+  --rate: 0%;
+  width: 82px;
+  height: 82px;
+  margin: 0 auto 8px;
+  border-radius: 50%;
+  background: conic-gradient(#2563eb var(--rate), #e2e8f0 0);
+  display: grid;
+  place-items: center;
+  position: relative;
+}
+
+.donut::after {
+  content: "";
+  position: absolute;
+  width: 58px;
+  height: 58px;
+  border-radius: 50%;
+  background: white;
+}
+
+.donut span {
+  position: relative;
+  z-index: 1;
+  font-size: 15px;
+  font-weight: 900;
+  color: #0f172a;
+}
+
+.donutCard strong {
+  display: block;
+  color: #0f172a;
+  font-size: 13px;
+}
+
+.donutCard p {
+  margin: 4px 0 0;
+  color: #64748b;
+  font-size: 12px;
 }
 
 .buttonGrid {
@@ -1000,24 +1018,7 @@ input {
     padding: 0 8px;
   }
 
-  .pinDeck {
-    width: 240px;
-    height: 220px;
+  .donutGrid {
+    grid-template-columns: 1fr;
   }
-
-  .pinDeckPin {
-    width: 38px;
-    height: 38px;
-  }
-
-  .pinDeckPin.p7 { left: 32px; top: 20px; }
-  .pinDeckPin.p8 { left: 77px; top: 20px; }
-  .pinDeckPin.p9 { left: 122px; top: 20px; }
-  .pinDeckPin.p10 { left: 167px; top: 20px; }
-  .pinDeckPin.p4 { left: 54px; top: 74px; }
-  .pinDeckPin.p5 { left: 99px; top: 74px; }
-  .pinDeckPin.p6 { left: 144px; top: 74px; }
-  .pinDeckPin.p2 { left: 77px; top: 128px; }
-  .pinDeckPin.p3 { left: 122px; top: 128px; }
-  .pinDeckPin.p1 { left: 99px; top: 178px; }
 }
