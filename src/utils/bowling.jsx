@@ -214,29 +214,21 @@ export function formatPinButton(pins, next, rolls) {
 }
 
 export function renderFrameMark(mark) {
-  if (!mark) {
-    return React.createElement("span", { className: "markEmpty" }, "\u00A0");
-  }
+  if (!mark) return <span className="markEmpty">&nbsp;</span>;
 
   const parts = String(mark)
     .split("|")
     .map((part) => part.trim())
     .filter((part) => part.length > 0);
 
-  if (parts.length === 1) {
-    return React.createElement("span", { className: "markPart single" }, parts[0]);
-  }
+  if (parts.length === 1) return <span className="markPart single">{parts[0]}</span>;
 
-  return parts.map((part, index) =>
-    React.createElement(
-      React.Fragment,
-      { key: `${part}-${index}` },
-      React.createElement("span", { className: "markPart" }, part),
-      index < parts.length - 1
-        ? React.createElement("span", { className: "markDivider" }, "|")
-        : null
-    )
-  );
+  return parts.map((part, index) => (
+    <React.Fragment key={`${part}-${index}`}>
+      <span className="markPart">{part}</span>
+      {index < parts.length - 1 && <span className="markDivider">|</span>}
+    </React.Fragment>
+  ));
 }
 
 export function displayTotal(total) {
