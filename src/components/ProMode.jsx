@@ -28,6 +28,27 @@ export default function ProMode({ next, onAddRoll, pinFrames, setPinFrames }) {
 
     const firstRoll = 10 - firstRemainingPins.length;
 
+    // 10프레임 3구는 보너스 투구 1번만 입력하고 종료한다.
+    // 여기서 후구 입력 단계로 넘어가면 실제보다 한 번 더 던지는 UI가 된다.
+    if (next.frame === 10 && next.rollInFrame === 3) {
+      onAddRoll(firstRoll);
+      setPinFrames((prev) => [
+        ...prev,
+        {
+          frame: next.frame,
+          firstRemaining: [...firstRemainingPins],
+          secondRemaining: [],
+          converted: null,
+          isSplit: false,
+          leaveName: `10F 보너스 ${firstRoll}핀`,
+        },
+      ]);
+      setFirstRemainingPins([]);
+      setSecondRemainingPins([]);
+      setProStep("firstRemaining");
+      return;
+    }
+
     if (firstRoll === 10) {
       onAddRoll(10);
       setPinFrames((prev) => [
@@ -86,10 +107,18 @@ export default function ProMode({ next, onAddRoll, pinFrames, setPinFrames }) {
   return (
     <section className="proPanel">
       <div className="proStepCard">
-        <strong>{proStep === "firstRemaining" ? "초구 후 남은 핀 선택" : "후구 후 남은 핀 선택"}</strong>
+        <strong>
+          {proStep === "firstRemaining"
+            ? next?.frame === 10 && next?.rollInFrame === 3
+              ? "10프레임 보너스 투구 후 남은 핀 선택"
+              : "초구 후 남은 핀 선택"
+            : "후구 후 남은 핀 선택"}
+        </strong>
         <p>
           {proStep === "firstRemaining"
-            ? "쓰러진 핀이 아니라 남아있는 핀만 선택하세요. 아무것도 선택하지 않으면 스트라이크입니다."
+            ? next?.frame === 10 && next?.rollInFrame === 3
+              ? "보너스 투구는 1번만 입력합니다. 투구 후 남은 핀만 선택하고 바로 입력하세요."
+              : "쓰러진 핀이 아니라 남아있는 핀만 선택하세요. 아무것도 선택하지 않으면 스트라이크입니다."
             : "초구 후 남았던 핀 중 후구 후에도 남은 핀만 선택하세요. 아무것도 안 남으면 커버 성공입니다."}
         </p>
       </div>
@@ -103,7 +132,11 @@ export default function ProMode({ next, onAddRoll, pinFrames, setPinFrames }) {
             helper="남은 핀만 클릭"
           />
           <button className="proPrimaryButton" type="button" onClick={confirmFirstRemaining} disabled={!next}>
-            {firstRemainingPins.length === 0 ? "스트라이크 입력" : "후구 입력으로 이동"}
+            {next?.frame === 10 && next?.rollInFrame === 3
+              ? "보너스 투구 입력"
+              : firstRemainingPins.length === 0
+                ? "스트라이크 입력"
+                : "후구 입력으로 이동"}
           </button>
         </>
       ) : (
