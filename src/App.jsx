@@ -530,63 +530,6 @@ function isTenthFrameGutterSpareAvailable(next, rolls) {
   return firstRoll === 10 && secondRoll === 0;
 }
 
-
-function pinName(pins) {
-  const sorted = [...pins].sort((a, b) => a - b);
-  if (sorted.length === 0) return "스트라이크";
-  if (sorted.length === 1) return `${sorted[0]}핀`;
-  return sorted.join("-");
-}
-
-function isSplitLeave(pins) {
-  const key = [...pins].sort((a, b) => a - b).join("-");
-  const splitKeys = new Set([
-    "7-10", "4-6", "4-10", "6-7", "2-7", "3-10",
-    "2-4-10", "3-6-7", "4-6-7-10", "2-8-10", "3-7-9",
-  ]);
-  return splitKeys.has(key);
-}
-
-function calcProStats(pinHistory) {
-  const attempts = pinHistory.filter((item) => Array.isArray(item.firstRemaining) && item.firstRemaining.length > 0);
-  const converted = attempts.filter((item) => item.converted);
-  const tenPin = attempts.filter((item) => item.firstRemaining.length === 1 && item.firstRemaining[0] === 10);
-  const sevenPin = attempts.filter((item) => item.firstRemaining.length === 1 && item.firstRemaining[0] === 7);
-  const splits = attempts.filter((item) => item.isSplit);
-
-  const rate = (items, successItems) => {
-    if (!items.length) return 0;
-    return Math.round((successItems.length / items.length) * 100);
-  };
-
-  return {
-    totalAttempts: attempts.length,
-    totalConverted: converted.length,
-    totalRate: rate(attempts, converted),
-    tenPinAttempts: tenPin.length,
-    tenPinConverted: tenPin.filter((item) => item.converted).length,
-    tenPinRate: rate(tenPin, tenPin.filter((item) => item.converted)),
-    sevenPinAttempts: sevenPin.length,
-    sevenPinConverted: sevenPin.filter((item) => item.converted).length,
-    sevenPinRate: rate(sevenPin, sevenPin.filter((item) => item.converted)),
-    splitAttempts: splits.length,
-    splitConverted: splits.filter((item) => item.converted).length,
-    splitRate: rate(splits, splits.filter((item) => item.converted)),
-  };
-}
-
-function DonutStat({ label, value, detail }) {
-  return (
-    <div className="donutCard">
-      <div className="donut" style={{ "--rate": `${value}%` }}>
-        <span>{value}%</span>
-      </div>
-      <strong>{label}</strong>
-      <p>{detail}</p>
-    </div>
-  );
-}
-
 function getProStepLabel(next) {
   if (!next) return "게임 완료";
   if (next.rollInFrame === 1) return `${next.frame}F 초구`;
@@ -604,9 +547,9 @@ function getPinsLeftCount(selectedPins) {
 
 function getPinDeckHint(next) {
   if (!next) return "게임이 완료되었습니다.";
-  if (next.rollInFrame === 1) return "초구 후 남아있는 핀만 선택하세요. 아무것도 선택하지 않으면 스트라이크입니다.";
-  if (next.rollInFrame === 2) return "후구 후에도 남은 핀만 선택하세요. 아무것도 선택하지 않으면 커버 성공입니다.";
-  return "보너스 투구 후 남은 핀만 선택하세요.";
+  if (next.rollInFrame === 1) return "초구에 쓰러진 핀을 선택하세요.";
+  if (next.rollInFrame === 2) return "남은 핀 중 후구에 처리한 핀을 선택하세요.";
+  return "10프레임 보너스 투구 결과를 선택하세요.";
 }
 
 function PinDeck({ selectedPins, allowedPins, onTogglePin, disabled }) {
@@ -677,13 +620,9 @@ export default function App() {
   const groupedRecords = useMemo(() => groupRecordsByDate(records), [records]);
   const sortedDateKeys = useMemo(() => Object.keys(groupedRecords).sort((a, b) => b.localeCompare(a)), [groupedRecords]);
   const next = getFrameRollLimit(rolls);
-  const proStats = useMemo(() => calcProStats(proPinHistory), [proPinHistory]);
-  const remainingPinsAfterFirst = proFirstRollPins;
-  const allowedProPins = next?.rollInFrame === 2 && proFirstRollPins.length > 0 ? proFirstRollPins : allPins;
-  const proCanSubmit = Boolean(
-    next &&
-    proCurrentSelectedPins.every((pin) => allowedProPins.includes(pin))
-  );
+  const remainingPinsAfterFirst = allPins.filter((pin) => !proFirstRollPins.includes(pin));
+  const allowedProPins = next?.rollInFrame === 2 && next.frame < 10 ? remainingPinsAfterFirst : allPins;
+  const proCanSubmit = next && proCurrentSelectedPins.length <= next.max;
 
   useEffect(() => {
     if (!scoreboardRef.current || !next) return;
@@ -1124,65 +1063,38 @@ export default function App() {
     );
   };
 
-  const proQuickStrike = () => {
-    setProCurrentSelectedPins([]);
-  };
-
-  const proQuickGutter = () => {
-    setProCurrentSelectedPins([...allowedProPins].sort((a, b) => a - b));
-  };
-
   const submitProRoll = () => {
-    if (!next || !proCanSubmit) return;
+    if (!next || proCurrentSelectedPins.length > next.max) return;
 
-    const selectedRemaining = [...proCurrentSelectedPins].sort((a, b) => a - b);
-    let pinsDown = 0;
+    const pinsDown = getPinsDownCount(proCurrentSelectedPins);
+    const pinsLeft = getPinsLeftCount(proCurrentSelectedPins);
 
-    if (next.rollInFrame === 1) {
-      pinsDown = 10 - selectedRemaining.length;
-      setRolls((prev) => [...prev, pinsDown]);
+    setProPinHistory((prev) => [
+      ...prev,
+      {
+        frame: next.frame,
+        rollInFrame: next.rollInFrame,
+        pins: proCurrentSelectedPins,
+        pinsDown,
+        pinsLeft,
+      },
+    ]);
 
-      if (pinsDown < 10) {
-        setProFirstRollPins(selectedRemaining);
-      } else {
-        setProFirstRollPins([]);
-      }
-
-      setProCurrentSelectedPins([]);
-      return;
-    }
-
-    if (proFirstRollPins.length > 0) {
-      pinsDown = proFirstRollPins.length - selectedRemaining.length;
-
-      setProPinHistory((prev) => [
-        ...prev,
-        {
-          frame: next.frame,
-          rollInFrame: next.rollInFrame,
-          firstRemaining: [...proFirstRollPins],
-          secondRemaining: selectedRemaining,
-          converted: selectedRemaining.length === 0,
-          isSplit: isSplitLeave(proFirstRollPins),
-          leaveName: pinName(proFirstRollPins),
-        },
-      ]);
-
-      setRolls((prev) => [...prev, pinsDown]);
-      setProFirstRollPins([]);
-      setProCurrentSelectedPins([]);
-      return;
-    }
-
-    pinsDown = 10 - selectedRemaining.length;
-    setRolls((prev) => [...prev, pinsDown]);
-
-    if (next.frame === 10 && pinsDown < 10) {
-      setProFirstRollPins(selectedRemaining);
+    if (next.frame < 10 && next.rollInFrame === 1 && pinsDown < 10) {
+      setProFirstRollPins(proCurrentSelectedPins);
     } else {
       setProFirstRollPins([]);
     }
 
+    setRolls((prev) => [...prev, pinsDown]);
+    setProCurrentSelectedPins([]);
+  };
+
+  const proQuickStrike = () => {
+    setProCurrentSelectedPins(allPins);
+  };
+
+  const proQuickGutter = () => {
     setProCurrentSelectedPins([]);
   };
 
@@ -1455,7 +1367,7 @@ export default function App() {
                   <span>{getPinDeckHint(next)}</span>
                 </div>
                 <div className="proCountBadge">
-                  남은 핀 {proCurrentSelectedPins.length}
+                  {proCurrentSelectedPins.length}/{next?.max ?? 0}
                 </div>
               </div>
 
@@ -1467,11 +1379,11 @@ export default function App() {
               />
 
               <div className="proQuickActions">
-                <button type="button" onClick={proQuickStrike} disabled={!next}>
-                  남은 핀 없음
+                <button type="button" onClick={proQuickStrike} disabled={!next || next.max < 10}>
+                  전체 처리
                 </button>
                 <button type="button" onClick={proQuickGutter} disabled={!next}>
-                  모두 남음
+                  거터
                 </button>
                 <button type="button" onClick={() => setProCurrentSelectedPins([])} disabled={!next}>
                   선택 해제
@@ -1480,7 +1392,7 @@ export default function App() {
 
               <div className="proSubmitBox">
                 <div>
-                  <span>현재 선택한 남은 핀</span>
+                  <span>선택 핀</span>
                   <strong>{proCurrentSelectedPins.length ? proCurrentSelectedPins.join(", ") : "없음"}</strong>
                 </div>
                 <button type="button" onClick={submitProRoll} disabled={!proCanSubmit}>
@@ -1488,42 +1400,12 @@ export default function App() {
                 </button>
               </div>
 
-              {proFirstRollPins.length > 0 && (
+              {next?.rollInFrame === 2 && next.frame < 10 && (
                 <div className="remainingPinsBox">
-                  <span>초구 후 남은 핀</span>
-                  <strong>{proFirstRollPins.join(", ")}</strong>
+                  <span>남은 핀</span>
+                  <strong>{remainingPinsAfterFirst.length ? remainingPinsAfterFirst.join(", ") : "없음"}</strong>
                 </div>
               )}
-
-              <section className="proStats">
-                <div className="proStatsHeader">
-                  <strong>Pro 분석</strong>
-                  <span>현재 게임 기준</span>
-                </div>
-
-                <div className="donutGrid">
-                  <DonutStat
-                    label="전체 커버율"
-                    value={proStats.totalRate}
-                    detail={`${proStats.totalConverted}/${proStats.totalAttempts}`}
-                  />
-                  <DonutStat
-                    label="10핀 처리율"
-                    value={proStats.tenPinRate}
-                    detail={`${proStats.tenPinConverted}/${proStats.tenPinAttempts}`}
-                  />
-                  <DonutStat
-                    label="7핀 처리율"
-                    value={proStats.sevenPinRate}
-                    detail={`${proStats.sevenPinConverted}/${proStats.sevenPinAttempts}`}
-                  />
-                  <DonutStat
-                    label="스플릿 처리율"
-                    value={proStats.splitRate}
-                    detail={`${proStats.splitConverted}/${proStats.splitAttempts}`}
-                  />
-                </div>
-              </section>
             </section>
           )}
 
