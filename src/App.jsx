@@ -1033,6 +1033,17 @@ export default function App() {
     setRecords((prev) => prev.filter((record) => record.id !== id));
   };
 
+const APP_LOGGED_OUT_KEY = "bowling_app_logged_out";
+
+function createGuestName() {
+  const randomNumber = Math.floor(10000 + Math.random() * 90000);
+  return `Guest_${randomNumber}`;
+}
+
+function isGuestUser(user) {
+  return Boolean(user?.is_anonymous || user?.user_metadata?.guest_name);
+}
+
   if (authLoading) {
     return (
       <main className="app authPage">
