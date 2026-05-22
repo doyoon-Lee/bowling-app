@@ -688,37 +688,56 @@ export default function App() {
   const signInWithGoogle = () => signInWithProvider("google");
   const signInWithKakao = () => signInWithProvider("kakao");
 
-  const signInAsGuest = async () => {
-    const client = await getSupabaseClient();
-    if (!client) {
-      alert(".env 파일에 VITE_SUPABASE_URL, VITE_SUPABASE_ANON_KEY를 설정해야 합니다.");
-      return;
-    }
+    const signInAsGuest = async () => {
+      const client = await getSupabaseClient();
+      if (!client) return;
 
-    const guestName = createGuestName();
+      localStorage.removeItem(APP_LOGGED_OUT_KEY);
 
-    const { error } = await client.auth.signInAnonymously({
-      options: {
-        data: {
-          guest_name: guestName,
+      const { data: sessionData } = await client.auth.getSession();
+      const existingSession = sessionData?.session;
+
+      if (existingSession?.user && isGuestUser(existingSession.user)) {
+        setSession(existingSession);
+        return;
+      }
+
+      const guestName = createGuestName();
+
+      const { error } = await client.auth.signInAnonymously({
+        options: {
+          data: {
+            guest_name: guestName,
+          },
         },
-      },
-    });
+      });
 
-    if (error) {
-      alert(`게스트 로그인 실패: ${error.message}`);
-    }
-  };
+      if (error) {
+        alert(`게스트 로그인 실패: ${error.message}`);
+      }
+    };
 
   const signOut = async () => {
-    const client = await getSupabaseClient();
-    if (!client) return;
+  const client = await getSupabaseClient();
+  if (!client) return;
 
-    await client.auth.signOut();
+  if (isGuestUser(user)) {
+    localStorage.setItem(APP_LOGGED_OUT_KEY, "true");
+
+    setSession(null);
     setRecords([]);
     setRolls([]);
     setPlayerName("");
-  };
+    return;
+  }
+
+  localStorage.removeItem(APP_LOGGED_OUT_KEY);
+  await client.auth.signOut();
+
+  setRecords([]);
+  setRolls([]);
+  setPlayerName("");
+};
 
   const searchNearbyBowlingPlaces = () => {
     setIsPlaceModalOpen(true);
@@ -1094,7 +1113,9 @@ export default function App() {
             <p>{getDisplayUserName(user)}</p>
           </div>
           <div className="headerActions">
-            <button className="logoutButton" onClick={signOut}>로그아웃</button>
+            <button className="logoutButton" onClick={signOut}>
+            {isGuestUser(user) ? "게스트 초기화" : "로그아웃"}
+          </button>
           </div>
         </header>
 
