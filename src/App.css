@@ -126,7 +126,8 @@ input {
 }
 
 .googleLoginButton,
-.kakaoLoginButton {
+.kakaoLoginButton,
+.guestLoginButton {
   width: 100%;
   height: 50px;
   border: none;
@@ -145,6 +146,11 @@ input {
   color: #191919;
 }
 
+.guestLoginButton {
+  background: #0f172a;
+  color: white;
+}
+
 .loginButtonInner {
   display: flex;
   align-items: center;
@@ -157,17 +163,26 @@ input {
   height: 20px;
 }
 
-.kakaoLogoText {
+.kakaoLogoText,
+.guestLogoText {
   width: 22px;
   height: 22px;
   border-radius: 50%;
-  background: #191919;
-  color: #fee500;
   display: inline-flex;
   align-items: center;
   justify-content: center;
   font-size: 13px;
   font-weight: 900;
+}
+
+.kakaoLogoText {
+  background: #191919;
+  color: #fee500;
+}
+
+.guestLogoText {
+  background: white;
+  color: #0f172a;
 }
 
 .browserNotice {
@@ -224,6 +239,33 @@ input {
   padding: 0 10px;
   font-size: 12px;
   font-weight: 800;
+}
+
+.modeSwitch {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  background: #f1f5f9;
+  border: 1px solid #dbeafe;
+  border-radius: 16px;
+  padding: 4px;
+  margin-bottom: 10px;
+  gap: 4px;
+}
+
+.modeSwitch button {
+  height: 38px;
+  border: none;
+  border-radius: 12px;
+  background: transparent;
+  color: #64748b;
+  font-size: 13px;
+  font-weight: 900;
+}
+
+.modeSwitch button.active {
+  background: white;
+  color: #0284c7;
+  box-shadow: 0 4px 14px rgba(15, 23, 42, 0.08);
 }
 
 .playerBar {
@@ -424,6 +466,156 @@ input {
   opacity: 0.3;
 }
 
+.proPanel {
+  margin-top: 14px;
+  padding: 12px;
+  border: 1px solid #dbeafe;
+  border-radius: 18px;
+  background: #f8fafc;
+}
+
+.proHeader {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  align-items: center;
+  margin-bottom: 12px;
+}
+
+.proHeader strong {
+  display: block;
+  color: #0284c7;
+  font-size: 16px;
+}
+
+.proHeader span {
+  display: block;
+  margin-top: 3px;
+  color: #64748b;
+  font-size: 12px;
+}
+
+.proCountBadge {
+  min-width: 52px;
+  height: 34px;
+  border-radius: 999px;
+  background: white;
+  border: 1px solid #bfdbfe;
+  color: #0369a1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 13px;
+  font-weight: 900;
+}
+
+.pinDeck {
+  position: relative;
+  width: 260px;
+  height: 230px;
+  margin: 0 auto;
+  border-radius: 24px;
+  background: linear-gradient(180deg, #e0f2fe 0%, #f8fafc 100%);
+  border: 1px solid #bfdbfe;
+}
+
+.pinDeckPin {
+  position: absolute;
+  width: 42px;
+  height: 42px;
+  border-radius: 999px;
+  border: 2px solid #cbd5e1;
+  background: white;
+  color: #0f172a;
+  font-size: 15px;
+  font-weight: 900;
+  box-shadow: 0 4px 12px rgba(15, 23, 42, 0.08);
+}
+
+.pinDeckPin.selected {
+  background: #2563eb;
+  color: white;
+  border-color: #2563eb;
+}
+
+.pinDeckPin.disabled {
+  opacity: 0.25;
+}
+
+.pinDeckPin.p7 { left: 34px; top: 22px; }
+.pinDeckPin.p8 { left: 83px; top: 22px; }
+.pinDeckPin.p9 { left: 132px; top: 22px; }
+.pinDeckPin.p10 { left: 181px; top: 22px; }
+.pinDeckPin.p4 { left: 58px; top: 78px; }
+.pinDeckPin.p5 { left: 107px; top: 78px; }
+.pinDeckPin.p6 { left: 156px; top: 78px; }
+.pinDeckPin.p2 { left: 83px; top: 134px; }
+.pinDeckPin.p3 { left: 132px; top: 134px; }
+.pinDeckPin.p1 { left: 107px; top: 184px; }
+
+.proQuickActions {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.proQuickActions button,
+.proSubmitBox button {
+  height: 40px;
+  border: none;
+  border-radius: 12px;
+  background: #e2e8f0;
+  color: #0f172a;
+  font-size: 13px;
+  font-weight: 800;
+}
+
+.proQuickActions button:disabled,
+.proSubmitBox button:disabled {
+  opacity: 0.4;
+}
+
+.proSubmitBox {
+  display: grid;
+  grid-template-columns: 1fr 110px;
+  gap: 8px;
+  margin-top: 10px;
+  align-items: stretch;
+}
+
+.proSubmitBox > div,
+.remainingPinsBox {
+  background: white;
+  border: 1px solid #dbeafe;
+  border-radius: 14px;
+  padding: 9px 10px;
+}
+
+.proSubmitBox span,
+.remainingPinsBox span {
+  display: block;
+  color: #64748b;
+  font-size: 11px;
+  margin-bottom: 3px;
+}
+
+.proSubmitBox strong,
+.remainingPinsBox strong {
+  display: block;
+  color: #0f172a;
+  font-size: 13px;
+}
+
+.proSubmitBox button {
+  background: #2563eb;
+  color: white;
+}
+
+.remainingPinsBox {
+  margin-top: 8px;
+}
+
 .buttonGrid {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
@@ -582,15 +774,6 @@ input {
   color: #0284c7;
   font-size: 14px;
   margin-bottom: 8px;
-}
-
-.ocrPreviewBox small {
-  display: block;
-  margin-top: 8px;
-  color: #64748b;
-  font-size: 11px;
-  word-break: break-word;
-  line-height: 1.4;
 }
 
 .geminiScoreboardPreview {
@@ -816,28 +999,25 @@ input {
     font-size: 12px;
     padding: 0 8px;
   }
-}
 
-.guestLoginButton {
-  width: 100%;
-  height: 50px;
-  border: none;
-  border-radius: 16px;
-  background: #0f172a;
-  color: white;
-  font-size: 15px;
-  font-weight: 900;
-}
+  .pinDeck {
+    width: 240px;
+    height: 220px;
+  }
 
-.guestLogoText {
-  width: 22px;
-  height: 22px;
-  border-radius: 50%;
-  background: white;
-  color: #0f172a;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 13px;
-  font-weight: 900;
+  .pinDeckPin {
+    width: 38px;
+    height: 38px;
+  }
+
+  .pinDeckPin.p7 { left: 32px; top: 20px; }
+  .pinDeckPin.p8 { left: 77px; top: 20px; }
+  .pinDeckPin.p9 { left: 122px; top: 20px; }
+  .pinDeckPin.p10 { left: 167px; top: 20px; }
+  .pinDeckPin.p4 { left: 54px; top: 74px; }
+  .pinDeckPin.p5 { left: 99px; top: 74px; }
+  .pinDeckPin.p6 { left: 144px; top: 74px; }
+  .pinDeckPin.p2 { left: 77px; top: 128px; }
+  .pinDeckPin.p3 { left: 122px; top: 128px; }
+  .pinDeckPin.p1 { left: 99px; top: 178px; }
 }
