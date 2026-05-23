@@ -1,5 +1,5 @@
 import React from "react";
-import { displayTotal, renderFrameMark } from "../utils/bowling";
+import { displayTotal, renderFrameMark } from "../utils/bowling.jsx";
 import { getDayAverage, getDayHigh, getKoreaDateLabel } from "../utils/date";
 
 export default function History({ sortedDateKeys, groupedRecords, onDeleteRecord }) {

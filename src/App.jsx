@@ -4,13 +4,16 @@ import "./App.css";
 import AuthScreen from "./components/AuthScreen";
 import BeginnerKeypad from "./components/BeginnerKeypad";
 import History from "./components/History";
+import LiveRoom from "./components/LiveRoom";
 import OCRModal from "./components/OCRModal";
 import PlaceModal from "./components/PlaceModal";
+import RoomLobby from "./components/RoomLobby";
 import ProMode from "./components/ProMode";
 import Scoreboard from "./components/Scoreboard";
 
 import { APP_LOGGED_OUT_KEY, createGuestName, getDisplayUserName, isGuestUser, isInAppBrowser, openCurrentPageInExternalBrowser } from "./utils/auth";
-import { calcBowlingScore, calcMaxPossibleScore, getFrameRollLimit, normalizeGeminiRollsFromFrames, repairTenthFrameRolls } from "./utils/bowling";
+import { calcBowlingScore, calcMaxPossibleScore, getFrameRollLimit, normalizeGeminiRollsFromFrames, repairTenthFrameRolls } from "./utils/bowling.jsx";
+import { createRoom, findRoomByCode, joinRoomById, upsertRoomScore } from "./utils/room";
 import { groupRecordsByDate } from "./utils/date";
 import { getCachedSupabaseClient, getSupabaseClient } from "./utils/supabaseClient";
 
@@ -18,6 +21,11 @@ export default function App() {
   const [session, setSession] = useState(null);
   const [authLoading, setAuthLoading] = useState(true);
   const [scoreMode, setScoreMode] = useState("beginner");
+  const [appMode, setAppMode] = useState("solo");
+  const [roomId, setRoomId] = useState(null);
+  const [roomCode, setRoomCode] = useState("");
+  const [roomPlayers, setRoomPlayers] = useState([]);
+  const [roomScores, setRoomScores] = useState([]);
 
   const [playerName, setPlayerName] = useState("");
   const [place, setPlace] = useState("");
@@ -171,6 +179,98 @@ export default function App() {
     };
   }, [user]);
 
+  useEffect(() => {
+    if (!roomId) {
+      setRoomPlayers([]);
+      setRoomScores([]);
+      return;
+    }
+
+    let channel;
+    let mounted = true;
+
+    async function subscribeRoom() {
+      const client = await getSupabaseClient();
+      if (!client) return;
+
+      const fetchRoomData = async () => {
+        const { data: players } = await client
+          .from("bowling_room_players")
+          .select("*")
+          .eq("room_id", roomId)
+          .order("created_at", { ascending: true });
+
+        const { data: scores } = await client
+          .from("bowling_room_scores")
+          .select("*")
+          .eq("room_id", roomId)
+          .order("updated_at", { ascending: false });
+
+        if (!mounted) return;
+        setRoomPlayers(players || []);
+        setRoomScores(scores || []);
+      };
+
+      await fetchRoomData();
+
+      channel = client
+        .channel(`room-${roomId}`)
+        .on(
+          "postgres_changes",
+          {
+            event: "*",
+            schema: "public",
+            table: "bowling_room_players",
+            filter: `room_id=eq.${roomId}`,
+          },
+          fetchRoomData
+        )
+        .on(
+          "postgres_changes",
+          {
+            event: "*",
+            schema: "public",
+            table: "bowling_room_scores",
+            filter: `room_id=eq.${roomId}`,
+          },
+          fetchRoomData
+        )
+        .subscribe();
+    }
+
+    subscribeRoom();
+
+    return () => {
+      mounted = false;
+      const cached = getCachedSupabaseClient();
+      if (channel && cached) cached.removeChannel(channel);
+    };
+  }, [roomId]);
+
+  useEffect(() => {
+    if (appMode !== "room" || !roomId || !user) return;
+
+    const timer = window.setTimeout(async () => {
+      const client = await getSupabaseClient();
+      if (!client) return;
+
+      try {
+        await upsertRoomScore(client, {
+          roomId,
+          userId: user.id,
+          playerName: playerName || getDisplayUserName(user),
+          rolls,
+          frames: result.frames,
+          total: result.total,
+        });
+      } catch (error) {
+        console.error("room score sync error", error);
+      }
+    }, 250);
+
+    return () => window.clearTimeout(timer);
+  }, [appMode, roomId, user, playerName, rolls, result.frames, result.total]);
+
   const signInWithProvider = async (provider) => {
     localStorage.removeItem(APP_LOGGED_OUT_KEY);
 
@@ -249,6 +349,58 @@ export default function App() {
     setRolls([]);
     setPinFrames([]);
     setPlayerName("");
+  };
+
+  const handleCreateRoom = async (roomNameInput) => {
+    const client = await getSupabaseClient();
+    if (!client || !user) return;
+
+    try {
+      const room = await createRoom(client, {
+        roomName: roomNameInput,
+        ownerId: user.id,
+        playerName: playerName || getDisplayUserName(user),
+      });
+
+      setRoomId(room.id);
+      setRoomCode(room.room_code);
+      setAppMode("room");
+    } catch (error) {
+      alert(`방 만들기 실패: ${error.message}`);
+    }
+  };
+
+  const handleJoinRoom = async (joinCodeInput) => {
+    const client = await getSupabaseClient();
+    if (!client || !user) return;
+
+    if (!joinCodeInput.trim()) {
+      alert("방 코드를 입력해주세요.");
+      return;
+    }
+
+    try {
+      const room = await findRoomByCode(client, joinCodeInput);
+      await joinRoomById(client, {
+        roomId: room.id,
+        userId: user.id,
+        playerName: playerName || getDisplayUserName(user),
+      });
+
+      setRoomId(room.id);
+      setRoomCode(room.room_code);
+      setAppMode("room");
+    } catch (error) {
+      alert(`방 참여 실패: ${error.message}`);
+    }
+  };
+
+  const handleLeaveRoom = () => {
+    setAppMode("solo");
+    setRoomId(null);
+    setRoomCode("");
+    setRoomPlayers([]);
+    setRoomScores([]);
   };
 
   const searchNearbyBowlingPlaces = () => {
@@ -579,6 +731,14 @@ export default function App() {
           </div>
         </header>
 
+        <RoomLobby
+          appMode={appMode}
+          roomCode={roomCode}
+          onCreateRoom={handleCreateRoom}
+          onJoinRoom={handleJoinRoom}
+          onLeaveRoom={handleLeaveRoom}
+        />
+
         <section className="scoreboardCard">
           <div className="modeSwitch">
             <button
@@ -669,6 +829,14 @@ export default function App() {
             placeCandidates={placeCandidates}
             onSelect={selectBowlingPlace}
             onClose={() => setIsPlaceModalOpen(false)}
+          />
+        )}
+
+        {appMode === "room" && (
+          <LiveRoom
+            roomPlayers={roomPlayers}
+            roomScores={roomScores}
+            currentUserId={user.id}
           />
         )}
 

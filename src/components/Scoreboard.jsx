@@ -1,5 +1,5 @@
 import React from "react";
-import { displayTotal, renderFrameMark } from "../utils/bowling";
+import { displayTotal, renderFrameMark } from "../utils/bowling.jsx";
 
 export default function Scoreboard({ result, scoreboardRef }) {
   return (

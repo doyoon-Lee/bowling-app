@@ -1,5 +1,5 @@
 import React from "react";
-import { calcBowlingScore, getPreview, renderFrameMark } from "../utils/bowling";
+import { calcBowlingScore, getPreview, renderFrameMark } from "../utils/bowling.jsx";
 
 export default function OCRModal({
   scoreImage,

@@ -4,7 +4,7 @@ import {
   isGutterSpareAvailable,
   isTenthFrameGutterSpareAvailable,
   keypadNumbers,
-} from "../utils/bowling";
+} from "../utils/bowling.jsx";
 
 export default function BeginnerKeypad({ next, rolls, onAddRoll, onCameraChange }) {
   return (
