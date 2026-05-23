@@ -214,12 +214,9 @@ export function formatPinButton(pins, next, rolls) {
 }
 
 export function renderFrameMark(mark) {
-  if (!mark) return "\u00A0";
-
-  return String(mark)
-    .replace(/\s*\|\s*/g, " | ")
-    .trim();
-}
+  if (!mark) {
+    return React.createElement("span", { className: "markEmpty" }, "\u00A0");
+  }
 
   const parts = String(mark)
     .split("|")
@@ -240,7 +237,7 @@ export function renderFrameMark(mark) {
         : null
     )
   );
-
+}
 
 export function displayTotal(total) {
   return total === "" || total === undefined || total === null ? " " : total;
