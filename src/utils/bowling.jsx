@@ -240,7 +240,7 @@ export function renderFrameMark(mark) {
         : null
     )
   );
-}
+
 
 export function displayTotal(total) {
   return total === "" || total === undefined || total === null ? " " : total;
