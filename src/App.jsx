@@ -374,7 +374,7 @@ export default function App() {
     const client = await getSupabaseClient();
     if (!client || !user) return;
 
-    if (!joinCodeInput.trim()) {
+    if (!joinCodeInput.trim().replace(/\D/g, "")) {
       alert("방 코드를 입력해주세요.");
       return;
     }
@@ -609,6 +609,36 @@ export default function App() {
     setGeminiPreviewFrames([]);
     setAnalysisAttempt(0);
   };
+
+
+  const syncRoomScoreLive = async (nextRolls) => {
+    if (appMode !== "room" || !roomId || !user) return;
+
+    const client = await getSupabaseClient();
+    if (!client) return;
+
+    const nextResult = calcBowlingScore(nextRolls);
+
+    await client.from("bowling_room_scores").upsert(
+      {
+        room_id: roomId,
+        user_id: user.id,
+        player_name: playerName.trim() || getDisplayUserName(user),
+        total: nextResult.total,
+        rolls: nextRolls,
+        frames: nextResult.frames,
+        updated_at: new Date().toISOString(),
+      },
+      {
+        onConflict: "room_id,user_id",
+      }
+    );
+  };
+
+  useEffect(() => {
+    if (appMode !== "room" || !roomId || !user) return;
+    syncRoomScoreLive(rolls);
+  }, [rolls, appMode, roomId, user?.id]);
 
   const addRoll = (pins) => {
     if (!next || pins > next.max) return;
