@@ -16,7 +16,7 @@ import { calcBowlingScore, calcMaxPossibleScore, getFrameRollLimit, normalizeGem
 import {createRoom, findRoomByCode, joinRoomById, upsertRoomScore } from "./utils/room";
 import { groupRecordsByDate } from "./utils/date";
 import { getCachedSupabaseClient, getSupabaseClient } from "./utils/supabaseClient";
-
+<h1>🎳 Bowling Score TEST</h1>
 export default function App() {
   const [session, setSession] = useState(null);
   const [authLoading, setAuthLoading] = useState(true);
