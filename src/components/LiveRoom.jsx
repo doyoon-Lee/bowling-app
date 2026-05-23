@@ -5,42 +5,18 @@ function getInitial(name) {
   return String(name || "?").trim().charAt(0).toUpperCase() || "?";
 }
 
-function getPlayerScore(scores, player) {
-  return scores.find((score) => score.user_id === player.user_id) || null;
-}
-
-function getScoreRows(roomScores = [], roomPlayers = []) {
-  const rowsFromPlayers = roomPlayers.map((player) => {
-    const score = getPlayerScore(roomScores, player);
-    return {
-      user_id: player.user_id,
-      player_name: player.player_name,
-      total: score?.total || 0,
-      frames: score?.frames || [],
-      updated_at: score?.updated_at,
-    };
-  });
-
-  const playerIds = new Set(rowsFromPlayers.map((row) => row.user_id));
-  const extraScores = roomScores
-    .filter((score) => !playerIds.has(score.user_id))
-    .map((score) => ({
-      user_id: score.user_id,
-      player_name: score.player_name,
-      total: score.total || 0,
-      frames: score.frames || [],
-      updated_at: score.updated_at,
-    }));
-
-  return [...rowsFromPlayers, ...extraScores];
-}
-
-export default function LiveRoom({ roomPlayers, roomScores, currentUserId }) {
-  const rows = getScoreRows(roomScores, roomPlayers);
+export default function LiveRoom({
+  roomCode,
+  roomScores = [],
+  roomPlayers = [],
+  currentUserId,
+  onLeaveRoom,
+}) {
+  const rows = roomScores;
   const participantCount = roomPlayers.length || rows.length || 0;
 
   return (
-    <section className="liveRoomBoard liveRoomCleanBoard">
+    <section className="liveRoomCleanBoard">
       <div className="liveRoomCleanHeader">
         <div>
           <h2>실시간 점수판</h2>
@@ -51,55 +27,60 @@ export default function LiveRoom({ roomPlayers, roomScores, currentUserId }) {
           <span className="liveRoomCodeBadge">{roomCode}</span>
           <span className="liveRoomCountBadge">{participantCount}명 참여</span>
           {onLeaveRoom && (
-            <button type="button" className="liveRoomLeaveButton" onClick={onLeaveRoom}>
+            <button className="liveRoomLeaveButton" onClick={onLeaveRoom}>
               방 나가기
             </button>
           )}
         </div>
       </div>
 
-      {rows.length === 0 ? (
-        <div className="liveRoomEmpty">아직 참가자 점수가 없습니다.</div>
-      ) : (
-        <div className="liveRoomPlayerGrid">
-          {rows.map((score) => {
-            const isMe = currentUserId && score.user_id === currentUserId;
+      <div className="liveRoomPlayerGrid">
+        {rows.map((score) => {
+          const isMe = currentUserId && score.user_id === currentUserId;
 
-            return (
-              <article className={isMe ? "liveRoomPlayerCard isMe" : "liveRoomPlayerCard"} key={score.user_id || score.player_name}>
-                <div className="liveRoomPlayerTop">
-                  <div className="liveRoomPlayerIdentity">
-                    <div className="liveRoomAvatar">{isMe ? "나" : getInitial(score.player_name)}</div>
-                    <div>
-                      <strong>{score.player_name || "참가자"}</strong>
-                      {isMe && <span>내 점수</span>}
-                    </div>
+          return (
+            <article
+              className={isMe ? "liveRoomPlayerCard isMe" : "liveRoomPlayerCard"}
+              key={score.user_id || score.player_name}
+            >
+              <div className="liveRoomPlayerTop">
+                <div className="liveRoomPlayerIdentity">
+                  <div className="liveRoomAvatar">
+                    {isMe ? "나" : getInitial(score.player_name)}
                   </div>
-
-                  <div className="liveRoomTotalBox">
-                    <span>총점</span>
-                    <strong>{score.total || 0}</strong>
+                  <div>
+                    <strong>{score.player_name || "참가자"}</strong>
+                    {isMe && <span>내 점수</span>}
                   </div>
                 </div>
 
-                <div className="liveRoomFrameStrip" aria-label="{score.player_name} 점수판">
-                  {Array.from({ length: 10 }, (_, index) => {
-                    const frame = (score.frames || [])[index];
+                <div className="liveRoomTotalBox">
+                  <span>총점</span>
+                  <strong>{score.total || 0}</strong>
+                </div>
+              </div>
 
-                    return (
-                      <div className="liveRoomFrameCell" key={index}>
-                        <div className="liveRoomFrameNo">{index + 1}</div>
-                        <div className="liveRoomFrameMark">{renderFrameMark(frame?.mark)}</div>
-                        <div className="liveRoomFrameTotal">{displayTotal(frame?.total)}</div>
+              <div className="liveRoomFrameStrip">
+                {Array.from({ length: 10 }, (_, index) => {
+                  const frame = (score.frames || [])[index];
+
+                  return (
+                    <div className="liveRoomFrameCell" key={index}>
+                      <div className="liveRoomFrameNo">{index + 1}</div>
+                      <div className="liveRoomFrameMark">
+                        {renderFrameMark(frame?.mark)}
                       </div>
-                    );
-                  })}
-                </div>
-              </article>
-            );
-          })}
-        </div>
-      )}
+                      <div className="liveRoomFrameTotal">
+                        {displayTotal(frame?.total)}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </article>
+          );
+        })}
+      </div>
     </section>
   );
 }
