@@ -1250,3 +1250,41 @@ input {
     grid-template-columns: 1fr;
   }
 }
+
+
+/* Live room scoreboard: match main input scoreboard style */
+.liveScoreboardFrames {
+  display: grid;
+  grid-template-columns: repeat(9, 58px) 82px;
+  gap: 4px;
+  overflow-x: auto;
+  padding-bottom: 6px;
+  scroll-behavior: smooth;
+  -webkit-overflow-scrolling: touch;
+}
+
+.liveScoreboardFrames .frameBox {
+  min-width: 58px;
+}
+
+.liveScoreboardFrames .frameBox:nth-child(10) {
+  min-width: 82px;
+}
+
+.roomPlayerCard,
+.liveRoomPlayerCard {
+  background: white;
+  border: 1px solid #dbeafe;
+  border-radius: 18px;
+  padding: 12px;
+}
+
+.roomPlayerTotal,
+.liveRoomPlayerTotal {
+  color: #0284c7;
+}
+
+.miniFrames,
+.roomFrames {
+  display: none;
+}
