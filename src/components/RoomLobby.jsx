@@ -35,8 +35,10 @@ export default function RoomLobby({ appMode, roomCode, onCreateRoom, onJoinRoom,
       <div className="roomJoinBox">
         <input
           value={joinCodeInput}
-          onChange={(e) => setJoinCodeInput(e.target.value.toUpperCase())}
-          placeholder="예: BOWL-1234"
+          onChange={(e) => setJoinCodeInput(e.target.value.replace(/\D/g, "").slice(0, 6))}
+          placeholder="예: 483920"
+          inputMode="numeric"
+          maxLength={6}
         />
         <button type="button" onClick={() => onJoinRoom(joinCodeInput)}>방 참여</button>
       </div>

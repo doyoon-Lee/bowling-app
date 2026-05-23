@@ -9,7 +9,7 @@ export default function LiveRoom({ roomPlayers, roomScores, currentUserId }) {
       <div className="liveRoomBoardHeader">
         <div>
           <h2>실시간 점수판</h2>
-          <p>참가자가 저장하거나 입력할 때마다 자동으로 갱신됩니다.</p>
+          <p>참가자가 핀을 입력할 때마다 자동으로 갱신됩니다.</p>
         </div>
         <span>{roomPlayers.length}명 참여</span>
       </div>

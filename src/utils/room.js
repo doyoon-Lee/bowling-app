@@ -1,5 +1,5 @@
 export function generateRoomCode() {
-  return `BOWL-${Math.floor(1000 + Math.random() * 9000)}`;
+  return String(Math.floor(100000 + Math.random() * 900000));
 }
 
 export async function createRoom(client, { roomName, ownerId, playerName }) {
@@ -27,7 +27,7 @@ export async function createRoom(client, { roomName, ownerId, playerName }) {
 }
 
 export async function findRoomByCode(client, roomCode) {
-  const normalizedCode = roomCode.trim().toUpperCase();
+  const normalizedCode = roomCode.trim().replace(/\D/g, "");
 
   const { data: room, error } = await client
     .from("bowling_rooms")

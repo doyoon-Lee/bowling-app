@@ -13,7 +13,7 @@ import Scoreboard from "./components/Scoreboard";
 
 import { APP_LOGGED_OUT_KEY, createGuestName, getDisplayUserName, isGuestUser, isInAppBrowser, openCurrentPageInExternalBrowser } from "./utils/auth";
 import { calcBowlingScore, calcMaxPossibleScore, getFrameRollLimit, normalizeGeminiRollsFromFrames, repairTenthFrameRolls } from "./utils/bowling.jsx";
-import { createRoom, findRoomByCode, joinRoomById, upsertRoomScore } from "./utils/room";
+import { createRoom, findRoomByCode, joinRoomById } from "./utils/room";
 import { groupRecordsByDate } from "./utils/date";
 import { getCachedSupabaseClient, getSupabaseClient } from "./utils/supabaseClient";
 
@@ -247,30 +247,6 @@ export default function App() {
     };
   }, [roomId]);
 
-  useEffect(() => {
-    if (appMode !== "room" || !roomId || !user) return;
-
-    const timer = window.setTimeout(async () => {
-      const client = await getSupabaseClient();
-      if (!client) return;
-
-      try {
-        await upsertRoomScore(client, {
-          roomId,
-          userId: user.id,
-          playerName: playerName || getDisplayUserName(user),
-          rolls,
-          frames: result.frames,
-          total: result.total,
-        });
-      } catch (error) {
-        console.error("room score sync error", error);
-      }
-    }, 250);
-
-    return () => window.clearTimeout(timer);
-  }, [appMode, roomId, user, playerName, rolls, result.frames, result.total]);
-
   const signInWithProvider = async (provider) => {
     localStorage.removeItem(APP_LOGGED_OUT_KEY);
 
@@ -374,8 +350,8 @@ export default function App() {
     const client = await getSupabaseClient();
     if (!client || !user) return;
 
-    if (!joinCodeInput.trim().replace(/\D/g, "")) {
-      alert("방 코드를 입력해주세요.");
+    if (joinCodeInput.trim().replace(/\D/g, "").length !== 6) {
+      alert("6자리 방 코드를 입력해주세요.");
       return;
     }
 
@@ -618,21 +594,24 @@ export default function App() {
     if (!client) return;
 
     const nextResult = calcBowlingScore(nextRolls);
+    const optimisticScore = {
+      room_id: roomId,
+      user_id: user.id,
+      player_name: playerName.trim() || getDisplayUserName(user),
+      total: nextResult.total,
+      rolls: nextRolls,
+      frames: nextResult.frames,
+      updated_at: new Date().toISOString(),
+    };
 
-    await client.from("bowling_room_scores").upsert(
-      {
-        room_id: roomId,
-        user_id: user.id,
-        player_name: playerName.trim() || getDisplayUserName(user),
-        total: nextResult.total,
-        rolls: nextRolls,
-        frames: nextResult.frames,
-        updated_at: new Date().toISOString(),
-      },
-      {
-        onConflict: "room_id,user_id",
-      }
-    );
+    setRoomScores((prev) => {
+      const others = prev.filter((score) => score.user_id !== user.id);
+      return [optimisticScore, ...others];
+    });
+
+    await client.from("bowling_room_scores").upsert(optimisticScore, {
+      onConflict: "room_id,user_id",
+    });
   };
 
   useEffect(() => {
@@ -870,11 +849,13 @@ export default function App() {
           />
         )}
 
-        <History
-          sortedDateKeys={sortedDateKeys}
-          groupedRecords={groupedRecords}
-          onDeleteRecord={deleteRecord}
-        />
+        {appMode !== "room" && (
+          <History
+            sortedDateKeys={sortedDateKeys}
+            groupedRecords={groupedRecords}
+            onDeleteRecord={deleteRecord}
+          />
+        )}
       </section>
     </main>
   );
