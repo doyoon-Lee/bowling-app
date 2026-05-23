@@ -785,10 +785,6 @@ export default function App() {
               <span>MAX</span>
               <strong>{maxPossible}</strong>
             </div>
-            <div>
-              <span>현재 입력</span>
-              <strong className="smallScore">{next ? `${next.frame}F ${next.rollInFrame}구` : "완료"}</strong>
-            </div>
           </div>
 
           <Scoreboard result={result} scoreboardRef={scoreboardRef} />
