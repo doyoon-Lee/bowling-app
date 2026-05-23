@@ -1,5 +1,3 @@
-import React from "react";
-
 export const keypadNumbers = [1, 2, 3, 4, 5, 6, 7, 8, 9, 0, 10];
 export const allPins = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10];
 
@@ -214,29 +212,11 @@ export function formatPinButton(pins, next, rolls) {
 }
 
 export function renderFrameMark(mark) {
-  if (!mark) {
-    return React.createElement("span", { className: "markEmpty" }, "\u00A0");
-  }
+  if (!mark) return "\u00A0";
 
-  const parts = String(mark)
-    .split("|")
-    .map((part) => part.trim())
-    .filter((part) => part.length > 0);
-
-  if (parts.length === 1) {
-    return React.createElement("span", { className: "markPart single" }, parts[0]);
-  }
-
-  return parts.map((part, index) =>
-    React.createElement(
-      React.Fragment,
-      { key: `${part}-${index}` },
-      React.createElement("span", { className: "markPart" }, part),
-      index < parts.length - 1
-        ? React.createElement("span", { className: "markDivider" }, "|")
-        : null
-    )
-  );
+  return String(mark)
+    .replace(/\\s*\\|\\s*/g, " | ")
+    .trim();
 }
 
 export function displayTotal(total) {

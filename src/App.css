@@ -1453,3 +1453,27 @@ input {
   color: #0f172a !important;
   padding: 0 !important;
 }
+
+
+/* Frame mark text safety fix */
+.frameMark .markPart,
+.frameMark .markPart.single,
+.frameMark .markDivider,
+.geminiScoreFrameMark .markPart,
+.geminiScoreFrameMark .markPart.single,
+.geminiScoreFrameMark .markDivider,
+.liveFrameMark .markPart,
+.liveFrameMark .markPart.single,
+.liveFrameMark .markDivider,
+.liveRoomFrameMark .markPart,
+.liveRoomFrameMark .markPart.single,
+.liveRoomFrameMark .markDivider {
+  background: transparent !important;
+  border: 0 !important;
+  box-shadow: none !important;
+  color: inherit !important;
+  min-width: 0 !important;
+  height: auto !important;
+  padding: 0 !important;
+  border-radius: 0 !important;
+}
