@@ -1343,3 +1343,44 @@ input {
 .liveRoomPlayerTotal {
   color: #0284c7;
 }
+
+
+/* Final live-room frame override: remove inner blue boxes around X/marks */
+.liveScoreboardFrames .markPart,
+.liveScoreboardFrames .markPart.single,
+.liveScoreboardFrames .markDivider {
+  background: transparent !important;
+  border: 0 !important;
+  box-shadow: none !important;
+  color: #0f172a !important;
+  min-width: 12px;
+  height: auto !important;
+  padding: 0 !important;
+  border-radius: 0 !important;
+}
+
+.liveScoreboardFrames .liveFrameMark,
+.liveScoreboardFrames .frameMark {
+  background: #ffffff !important;
+  color: #0f172a !important;
+  border-bottom: 1px solid #bae6fd !important;
+  overflow: hidden;
+}
+
+.liveScoreboardFrames .liveFrameBox,
+.liveScoreboardFrames .frameBox {
+  background: #0284c7 !important;
+  border: 1px solid #7dd3fc !important;
+}
+
+.liveScoreboardFrames .liveFrameNo,
+.liveScoreboardFrames .frameNo {
+  background: #0369a1 !important;
+  color: #d1fae5 !important;
+}
+
+.liveScoreboardFrames .liveFrameTotal,
+.liveScoreboardFrames .frameTotal {
+  background: #0284c7 !important;
+  color: #ffffff !important;
+}
