@@ -1453,3 +1453,340 @@ input {
   color: #0f172a !important;
   padding: 0 !important;
 }
+
+
+/* Mobile viewport fit final fix */
+html,
+body,
+#root {
+  max-width: 100%;
+  overflow-x: hidden;
+}
+
+body {
+  overscroll-behavior-x: none;
+}
+
+.app {
+  max-width: 100vw;
+  overflow-x: hidden;
+  padding-left: max(8px, env(safe-area-inset-left));
+  padding-right: max(8px, env(safe-area-inset-right));
+}
+
+.container,
+.authContainer {
+  max-width: min(520px, 100%);
+  overflow-x: hidden;
+}
+
+.scoreboardCard,
+.roomModePanel,
+.liveRoomBoard,
+.liveRoomCleanBoard,
+.history,
+.dateGroup,
+.loginCard {
+  max-width: 100%;
+  overflow-x: hidden;
+}
+
+.playerBar {
+  grid-template-columns: 1fr 1fr;
+  min-width: 0;
+}
+
+.playerBar input {
+  width: 100%;
+  min-width: 0;
+}
+
+.summaryBoard {
+  grid-template-columns: 1fr 1fr;
+}
+
+.laneScoreboard,
+.recordFrames,
+.geminiScoreboardPreview,
+.liveScoreboardFrames,
+.liveRoomFrameStrip,
+.miniFrames {
+  max-width: 100%;
+  overflow-x: auto;
+  overflow-y: hidden;
+  -webkit-overflow-scrolling: touch;
+}
+
+.pinGrid {
+  max-width: 100%;
+}
+
+.pin {
+  min-width: 0;
+}
+
+.buttonGrid {
+  max-width: 100%;
+}
+
+.liveRoomPlayerCard,
+.roomPlayerCard {
+  max-width: 100%;
+  min-width: 0;
+  overflow: hidden;
+}
+
+.liveRoomPlayerTop,
+.roomPlayerTop {
+  min-width: 0;
+}
+
+.liveRoomPlayerIdentity,
+.liveRoomPlayerIdentity > div {
+  min-width: 0;
+}
+
+.liveRoomTotalBox {
+  flex-shrink: 0;
+}
+
+@media (max-width: 520px) {
+  .app {
+    padding: 8px;
+  }
+
+  .compactHeader {
+    align-items: flex-start;
+  }
+
+  .compactHeader h1 {
+    font-size: 20px;
+  }
+
+  .compactHeader p {
+    font-size: 12px;
+  }
+
+  .logoutButton {
+    height: 32px;
+    padding: 0 9px;
+    font-size: 11px;
+  }
+
+  .scoreboardCard,
+  .roomModePanel,
+  .liveRoomBoard,
+  .liveRoomCleanBoard {
+    border-radius: 18px;
+    padding: 10px;
+  }
+
+  .modeSwitch button {
+    height: 36px;
+    font-size: 13px;
+  }
+
+  .playerBar {
+    gap: 6px;
+  }
+
+  .playerBar input {
+    height: 42px;
+    padding: 0 10px;
+    font-size: 13px;
+  }
+
+  .summaryBoard {
+    gap: 6px;
+  }
+
+  .summaryBoard > div {
+    padding: 9px 8px;
+    border-radius: 13px;
+  }
+
+  .summaryBoard span {
+    font-size: 11px;
+  }
+
+  .summaryBoard strong {
+    font-size: 28px;
+  }
+
+  .laneScoreboard {
+    grid-template-columns: repeat(9, 52px) 72px;
+    gap: 3px;
+  }
+
+  .frameBox {
+    min-width: 52px;
+    border-radius: 9px;
+  }
+
+  .frameBox:nth-child(10) {
+    min-width: 72px;
+  }
+
+  .frameNo {
+    height: 20px;
+    font-size: 10px;
+  }
+
+  .frameMark {
+    height: 32px;
+    font-size: 12px;
+  }
+
+  .frameTotal {
+    height: 28px;
+    font-size: 14px;
+  }
+
+  .scoreInputHeader {
+    margin-top: 12px;
+  }
+
+  .cameraButton {
+    padding: 7px 10px;
+    font-size: 11px;
+  }
+
+  .pinGrid {
+    gap: 7px;
+  }
+
+  .pin {
+    height: 54px;
+    border-radius: 13px;
+    font-size: 21px;
+  }
+
+  .buttonGrid {
+    gap: 7px;
+  }
+
+  .buttonGrid button {
+    height: 44px;
+    font-size: 13px;
+  }
+
+  .roomCreateBox,
+  .roomJoinBox {
+    grid-template-columns: 1fr;
+  }
+
+  .liveRoomBoardHeader,
+  .liveRoomCleanHeader {
+    gap: 8px;
+  }
+
+  .liveRoomBoardHeader h2,
+  .liveRoomCleanHeader h2 {
+    font-size: 18px;
+  }
+
+  .liveRoomBoardHeader p,
+  .liveRoomCleanHeader p {
+    font-size: 12px;
+  }
+
+  .liveRoomBoardHeader > span,
+  .liveRoomCountBadge {
+    height: 32px;
+    padding: 0 9px;
+    font-size: 11px;
+  }
+
+  .liveRoomCodeBadge {
+    display: none;
+  }
+
+  .liveRoomPlayerCard,
+  .roomPlayerCard {
+    padding: 10px;
+    border-radius: 17px;
+  }
+
+  .liveRoomAvatar {
+    width: 36px;
+    height: 36px;
+    flex-basis: 36px;
+    font-size: 14px;
+  }
+
+  .liveRoomPlayerIdentity strong,
+  .roomPlayerTop strong {
+    max-width: 120px;
+    font-size: 14px;
+  }
+
+  .liveRoomTotalBox {
+    min-width: 76px;
+    height: 50px;
+    padding: 0 9px;
+  }
+
+  .liveRoomTotalBox span {
+    font-size: 10px;
+  }
+
+  .liveRoomTotalBox strong {
+    font-size: 25px;
+  }
+
+  .liveRoomFrameStrip,
+  .miniFrames {
+    grid-template-columns: repeat(9, 36px) 48px;
+    gap: 2px;
+  }
+
+  .liveRoomFrameNo,
+  .miniFrame span {
+    height: 17px;
+    font-size: 9px;
+    line-height: 17px;
+  }
+
+  .liveRoomFrameMark,
+  .miniFrame strong {
+    height: 27px;
+    font-size: 10px;
+  }
+
+  .liveRoomFrameTotal,
+  .miniFrame em {
+    height: 22px;
+    font-size: 10px;
+  }
+}
+
+@media (max-width: 380px) {
+  .app {
+    padding: 6px;
+  }
+
+  .playerBar {
+    grid-template-columns: 1fr;
+  }
+
+  .laneScoreboard {
+    grid-template-columns: repeat(9, 48px) 66px;
+  }
+
+  .frameBox {
+    min-width: 48px;
+  }
+
+  .frameBox:nth-child(10) {
+    min-width: 66px;
+  }
+
+  .pin {
+    height: 50px;
+  }
+
+  .liveRoomFrameStrip,
+  .miniFrames {
+    grid-template-columns: repeat(9, 34px) 46px;
+  }
+}
