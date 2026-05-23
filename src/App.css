@@ -1790,3 +1790,72 @@ body {
     grid-template-columns: repeat(9, 34px) 46px;
   }
 }
+
+
+/* Live room frame spacing refinement */
+.liveRoomFrameStrip,
+.miniFrames {
+  gap: 6px !important;
+  padding: 2px 2px 8px;
+}
+
+.liveRoomFrameCell,
+.miniFrame {
+  border-radius: 11px !important;
+  box-shadow: 0 2px 6px rgba(2, 132, 199, 0.08);
+}
+
+.liveRoomFrameNo,
+.miniFrame span {
+  height: 20px;
+}
+
+.liveRoomFrameMark,
+.miniFrame strong {
+  height: 32px;
+}
+
+.liveRoomFrameTotal,
+.miniFrame em {
+  height: 26px;
+}
+
+@media (max-width: 520px) {
+  .liveRoomFrameStrip,
+  .miniFrames {
+    grid-template-columns: repeat(9, 40px) 54px !important;
+    gap: 5px !important;
+    padding: 2px 2px 8px;
+  }
+
+  .liveRoomFrameCell,
+  .miniFrame {
+    border-radius: 10px !important;
+  }
+
+  .liveRoomFrameNo,
+  .miniFrame span {
+    height: 18px;
+    font-size: 9px;
+  }
+
+  .liveRoomFrameMark,
+  .miniFrame strong {
+    height: 29px;
+    font-size: 10px;
+  }
+
+  .liveRoomFrameTotal,
+  .miniFrame em {
+    height: 24px;
+    font-size: 11px;
+  }
+}
+
+@media (max-width: 380px) {
+  .liveRoomFrameStrip,
+  .miniFrames {
+    grid-template-columns: repeat(9, 38px) 52px !important;
+    gap: 4px !important;
+  }
+}
