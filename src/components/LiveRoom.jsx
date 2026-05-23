@@ -33,15 +33,14 @@ export default function LiveRoom({ roomPlayers, roomScores, currentUserId }) {
 
                 <div className="roomPlayerTotal">{total}</div>
 
-                <div className="liveScoreboardFrames">
+                <div className="miniFrames">
                   {Array.from({ length: 10 }, (_, index) => {
                     const frame = frames[index];
-
                     return (
-                      <div className="liveFrameBox" key={index}>
-                        <div className="liveFrameNo">{index + 1}</div>
-                        <div className="liveFrameMark">{renderFrameMark(frame?.mark)}</div>
-                        <div className="liveFrameTotal">{displayTotal(frame?.total)}</div>
+                      <div className="miniFrame" key={index}>
+                        <span>{index + 1}</span>
+                        <strong>{renderFrameMark(frame?.mark)}</strong>
+                        <em>{displayTotal(frame?.total)}</em>
                       </div>
                     );
                   })}

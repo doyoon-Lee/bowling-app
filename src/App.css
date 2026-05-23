@@ -1188,6 +1188,62 @@ input {
   font-weight: 900;
 }
 
+.miniFrames {
+  display: grid;
+  grid-template-columns: repeat(9, 42px) 58px;
+  gap: 4px;
+  overflow-x: auto;
+  padding-bottom: 4px;
+  -webkit-overflow-scrolling: touch;
+}
+
+.miniFrame {
+  min-width: 42px;
+  overflow: hidden;
+  border-radius: 8px;
+  border: 1px solid #7dd3fc;
+  background: #0284c7;
+  text-align: center;
+}
+
+.miniFrame:nth-child(10) {
+  min-width: 58px;
+}
+
+.miniFrame span {
+  display: block;
+  height: 18px;
+  background: #0369a1;
+  color: #d1fae5;
+  font-size: 10px;
+  font-weight: 900;
+  line-height: 18px;
+}
+
+.miniFrame strong {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  height: 28px;
+  background: white;
+  color: #0f172a;
+  font-size: 10px;
+  font-weight: 900;
+}
+
+.miniFrame em {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 22px;
+  background: #0284c7;
+  color: white;
+  font-style: normal;
+  font-size: 10px;
+  font-weight: 900;
+}
+
 @media (max-width: 380px) {
   .roomCreateBox,
   .roomJoinBox {
@@ -1196,9 +1252,29 @@ input {
 }
 
 
-/* Live room scoreboard: same visual structure as the main scoreboard */
+/* Live room scoreboard uses the same frame style as main scoreboard */
 .liveScoreboardFrames {
   display: grid;
+  grid-template-columns: repeat(9, 58px) 82px;
+  gap: 4px;
+  overflow-x: auto;
+  padding-bottom: 6px;
+  scroll-behavior: smooth;
+  -webkit-overflow-scrolling: touch;
+}
+
+.liveScoreboardFrames .frameBox {
+  min-width: 58px;
+}
+
+.liveScoreboardFrames .frameBox:nth-child(10) {
+  min-width: 82px;
+}
+
+
+/* Live room scoreboard color fix: match main bowling scoreboard */
+.liveScoreboardFrames {
+  display: grid !important;
   grid-template-columns: repeat(9, 58px) 82px;
   gap: 4px;
   overflow-x: auto;
@@ -1257,15 +1333,224 @@ input {
   font-style: normal;
 }
 
+.roomPlayerCard,
+.liveRoomPlayerCard {
+  background: #ffffff;
+  border: 1px solid #dbeafe;
+}
+
+.roomPlayerTotal,
+.liveRoomPlayerTotal {
+  color: #0284c7;
+}
+
+
+/* Final live-room frame override: remove inner blue boxes around X/marks */
 .liveScoreboardFrames .markPart,
 .liveScoreboardFrames .markPart.single,
 .liveScoreboardFrames .markDivider {
-  background: transparent;
-  border: 0;
-  box-shadow: none;
-  color: #0f172a;
+  background: transparent !important;
+  border: 0 !important;
+  box-shadow: none !important;
+  color: #0f172a !important;
   min-width: 12px;
-  height: auto;
-  padding: 0;
-  border-radius: 0;
+  height: auto !important;
+  padding: 0 !important;
+  border-radius: 0 !important;
+}
+
+.liveScoreboardFrames .liveFrameMark,
+.liveScoreboardFrames .frameMark {
+  background: #ffffff !important;
+  color: #0f172a !important;
+  border-bottom: 1px solid #bae6fd !important;
+  overflow: hidden;
+}
+
+.liveScoreboardFrames .liveFrameBox,
+.liveScoreboardFrames .frameBox {
+  background: #0284c7 !important;
+  border: 1px solid #7dd3fc !important;
+}
+
+.liveScoreboardFrames .liveFrameNo,
+.liveScoreboardFrames .frameNo {
+  background: #0369a1 !important;
+  color: #d1fae5 !important;
+}
+
+.liveScoreboardFrames .liveFrameTotal,
+.liveScoreboardFrames .frameTotal {
+  background: #0284c7 !important;
+  color: #ffffff !important;
+}
+
+
+/* Live room scoreboard final style */
+.liveScoreboardFrames {
+  display: grid !important;
+  grid-template-columns: repeat(9, 58px) 82px;
+  gap: 4px;
+  overflow-x: auto;
+  padding-bottom: 6px;
+  -webkit-overflow-scrolling: touch;
+}
+
+.liveFrameBox {
+  min-width: 58px;
+  border-radius: 10px;
+  overflow: hidden;
+  border: 1px solid #7dd3fc;
+  background: #0284c7;
+  flex-shrink: 0;
+}
+
+.liveFrameBox:nth-child(10) {
+  min-width: 82px;
+}
+
+.liveFrameNo {
+  height: 22px;
+  background: #0369a1;
+  color: #d1fae5;
+  font-size: 11px;
+  font-weight: 800;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.liveFrameMark {
+  height: 34px;
+  background: #ffffff !important;
+  color: #0f172a !important;
+  font-size: 13px;
+  font-weight: 900;
+  border-bottom: 1px solid #bae6fd;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  white-space: nowrap;
+}
+
+.liveFrameTotal {
+  height: 30px;
+  background: #0284c7;
+  color: #ffffff;
+  font-size: 16px;
+  font-weight: 900;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.liveScoreboardFrames .markPart,
+.liveScoreboardFrames .markDivider {
+  background: transparent !important;
+  border: 0 !important;
+  box-shadow: none !important;
+  color: #0f172a !important;
+  padding: 0 !important;
+}
+
+
+/* Mobile live room scoreboard final fix */
+.liveRoomBoard,
+.liveRoomSection,
+.liveRoomScoreboard,
+.liveRoomPlayerCard,
+.roomPlayerCard {
+  max-width: 100%;
+  overflow-x: hidden;
+}
+
+.liveScoreboardFrames {
+  width: 100% !important;
+  max-width: 100% !important;
+  display: grid !important;
+  grid-template-columns: repeat(9, minmax(42px, 1fr)) minmax(58px, 1.3fr);
+  gap: 3px;
+  overflow-x: auto;
+  padding-bottom: 6px;
+  -webkit-overflow-scrolling: touch;
+}
+
+.liveFrameBox {
+  min-width: 0 !important;
+  border-radius: 8px;
+  overflow: hidden;
+  border: 1px solid #7dd3fc;
+  background: #0284c7;
+}
+
+.liveFrameBox:nth-child(10) {
+  min-width: 0 !important;
+}
+
+.liveFrameNo {
+  height: 20px;
+  background: #0369a1;
+  color: #d1fae5;
+  font-size: 10px;
+  font-weight: 800;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.liveFrameMark {
+  height: 32px;
+  background: #ffffff !important;
+  color: #0f172a !important;
+  font-size: 12px;
+  font-weight: 900;
+  border-bottom: 1px solid #bae6fd;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  white-space: nowrap;
+  letter-spacing: 0;
+  overflow: hidden;
+}
+
+.liveFrameTotal {
+  height: 28px;
+  background: #0284c7;
+  color: #ffffff;
+  font-size: 14px;
+  font-weight: 900;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.liveScoreboardFrames .markPart,
+.liveScoreboardFrames .markPart.single,
+.liveScoreboardFrames .markDivider,
+.liveFrameMark .markPart,
+.liveFrameMark .markPart.single,
+.liveFrameMark .markDivider {
+  background: transparent !important;
+  border: 0 !important;
+  box-shadow: none !important;
+  color: #0f172a !important;
+  min-width: 0 !important;
+  height: auto !important;
+  padding: 0 !important;
+  border-radius: 0 !important;
+}
+
+@media (max-width: 520px) {
+  .liveScoreboardFrames {
+    grid-template-columns: repeat(9, 42px) 56px;
+  }
+
+  .liveFrameMark {
+    font-size: 11px;
+  }
+
+  .liveFrameTotal {
+    font-size: 12px;
+  }
 }
