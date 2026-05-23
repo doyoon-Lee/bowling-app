@@ -214,9 +214,12 @@ export function formatPinButton(pins, next, rolls) {
 }
 
 export function renderFrameMark(mark) {
-  if (!mark) {
-    return React.createElement("span", { className: "markEmpty" }, "\u00A0");
-  }
+  if (!mark) return "\u00A0";
+
+  return String(mark)
+    .replace(/\s*\|\s*/g, " | ")
+    .trim();
+}
 
   const parts = String(mark)
     .split("|")
