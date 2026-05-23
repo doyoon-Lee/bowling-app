@@ -1252,7 +1252,7 @@ input {
 }
 
 
-/* Live room scoreboard: match main input scoreboard style */
+/* Live room scoreboard uses the same frame style as main scoreboard */
 .liveScoreboardFrames {
   display: grid;
   grid-template-columns: repeat(9, 58px) 82px;
@@ -1269,22 +1269,4 @@ input {
 
 .liveScoreboardFrames .frameBox:nth-child(10) {
   min-width: 82px;
-}
-
-.roomPlayerCard,
-.liveRoomPlayerCard {
-  background: white;
-  border: 1px solid #dbeafe;
-  border-radius: 18px;
-  padding: 12px;
-}
-
-.roomPlayerTotal,
-.liveRoomPlayerTotal {
-  color: #0284c7;
-}
-
-.miniFrames,
-.roomFrames {
-  display: none;
 }
