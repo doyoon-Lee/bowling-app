@@ -13,7 +13,7 @@ import Scoreboard from "./components/Scoreboard";
 
 import { APP_LOGGED_OUT_KEY, createGuestName, getDisplayUserName, isGuestUser, isInAppBrowser, openCurrentPageInExternalBrowser } from "./utils/auth";
 import { calcBowlingScore, calcMaxPossibleScore, getFrameRollLimit, normalizeGeminiRollsFromFrames, repairTenthFrameRolls } from "./utils/bowling.jsx";
-import { createRoom, findRoomByCode, joinRoomById } from "./utils/room";
+import {createRoom, findRoomByCode, joinRoomById, upsertRoomScore } from "./utils/room";
 import { groupRecordsByDate } from "./utils/date";
 import { getCachedSupabaseClient, getSupabaseClient } from "./utils/supabaseClient";
 

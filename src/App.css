@@ -1384,3 +1384,72 @@ input {
   background: #0284c7 !important;
   color: #ffffff !important;
 }
+
+
+/* Live room scoreboard final style */
+.liveScoreboardFrames {
+  display: grid !important;
+  grid-template-columns: repeat(9, 58px) 82px;
+  gap: 4px;
+  overflow-x: auto;
+  padding-bottom: 6px;
+  -webkit-overflow-scrolling: touch;
+}
+
+.liveFrameBox {
+  min-width: 58px;
+  border-radius: 10px;
+  overflow: hidden;
+  border: 1px solid #7dd3fc;
+  background: #0284c7;
+  flex-shrink: 0;
+}
+
+.liveFrameBox:nth-child(10) {
+  min-width: 82px;
+}
+
+.liveFrameNo {
+  height: 22px;
+  background: #0369a1;
+  color: #d1fae5;
+  font-size: 11px;
+  font-weight: 800;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.liveFrameMark {
+  height: 34px;
+  background: #ffffff !important;
+  color: #0f172a !important;
+  font-size: 13px;
+  font-weight: 900;
+  border-bottom: 1px solid #bae6fd;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  white-space: nowrap;
+}
+
+.liveFrameTotal {
+  height: 30px;
+  background: #0284c7;
+  color: #ffffff;
+  font-size: 16px;
+  font-weight: 900;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.liveScoreboardFrames .markPart,
+.liveScoreboardFrames .markDivider {
+  background: transparent !important;
+  border: 0 !important;
+  box-shadow: none !important;
+  color: #0f172a !important;
+  padding: 0 !important;
+}
