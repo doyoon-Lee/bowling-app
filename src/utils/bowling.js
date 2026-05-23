@@ -215,7 +215,7 @@ export function renderFrameMark(mark) {
   if (!mark) return "\u00A0";
 
   return String(mark)
-    .replace(/\\s*\\|\\s*/g, " | ")
+    .replace(/\s*\|\s*/g, " | ")
     .trim();
 }
 

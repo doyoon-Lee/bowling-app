@@ -215,30 +215,9 @@ export function renderFrameMark(mark) {
   if (!mark) return "\u00A0";
 
   return String(mark)
-    .replace(/\\s*\\|\\s*/g, " | ")
+    .replace(/\s*\|\s*/g, " | ")
     .trim();
 }
-
-  const parts = String(mark)
-    .split("|")
-    .map((part) => part.trim())
-    .filter((part) => part.length > 0);
-
-  if (parts.length === 1) {
-    return React.createElement("span", { className: "markPart single" }, parts[0]);
-  }
-
-  return parts.map((part, index) =>
-    React.createElement(
-      React.Fragment,
-      { key: `${part}-${index}` },
-      React.createElement("span", { className: "markPart" }, part),
-      index < parts.length - 1
-        ? React.createElement("span", { className: "markDivider" }, "|")
-        : null
-    )
-  );
-
 
 export function displayTotal(total) {
   return total === "" || total === undefined || total === null ? " " : total;

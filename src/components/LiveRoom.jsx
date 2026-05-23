@@ -1,86 +1,55 @@
 import React from "react";
-import { displayTotal, renderFrameMark } from "../utils/bowling";
+import { displayTotal, renderFrameMark } from "../utils/bowling.jsx";
 
-function getInitial(name) {
-  return String(name || "?").trim().charAt(0).toUpperCase() || "?";
-}
-
-export default function LiveRoom({
-  roomCode,
-  roomScores = [],
-  roomPlayers = [],
-  currentUserId,
-  onLeaveRoom,
-}) {
-  const rows = roomScores;
-  const participantCount = roomPlayers.length || rows.length || 0;
+export default function LiveRoom({ roomPlayers, roomScores, currentUserId }) {
+  const scoresByUser = new Map(roomScores.map((score) => [score.user_id, score]));
 
   return (
-    <section className="liveRoomCleanBoard">
-      <div className="liveRoomCleanHeader">
+    <section className="liveRoomBoard">
+      <div className="liveRoomBoardHeader">
         <div>
           <h2>실시간 점수판</h2>
           <p>참가자가 핀을 입력할 때마다 자동으로 갱신됩니다.</p>
         </div>
+        <span>{roomPlayers.length}명 참여</span>
+      </div>
 
-        <div className="liveRoomHeaderActions">
-          <span className="liveRoomCodeBadge">{roomCode}</span>
-          <span className="liveRoomCountBadge">{participantCount}명 참여</span>
-          {onLeaveRoom && (
-            <button className="liveRoomLeaveButton" onClick={onLeaveRoom}>
-              방 나가기
-            </button>
-          )}
+      {roomPlayers.length === 0 ? (
+        <div className="empty">아직 참가자가 없습니다.</div>
+      ) : (
+        <div className="roomPlayerGrid">
+          {roomPlayers.map((player) => {
+            const score = scoresByUser.get(player.user_id);
+            const frames = score?.frames || [];
+            const total = score?.total ?? 0;
+            const isMe = player.user_id === currentUserId;
+
+            return (
+              <div className={isMe ? "roomPlayerCard me" : "roomPlayerCard"} key={player.user_id}>
+                <div className="roomPlayerTop">
+                  <strong>{player.player_name}</strong>
+                  {isMe && <span>나</span>}
+                </div>
+
+                <div className="roomPlayerTotal">{total}</div>
+
+                <div className="miniFrames">
+                  {Array.from({ length: 10 }, (_, index) => {
+                    const frame = frames[index];
+                    return (
+                      <div className="miniFrame" key={index}>
+                        <span>{index + 1}</span>
+                        <strong>{renderFrameMark(frame?.mark)}</strong>
+                        <em>{displayTotal(frame?.total)}</em>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            );
+          })}
         </div>
-      </div>
-
-      <div className="liveRoomPlayerGrid">
-        {rows.map((score) => {
-          const isMe = currentUserId && score.user_id === currentUserId;
-
-          return (
-            <article
-              className={isMe ? "liveRoomPlayerCard isMe" : "liveRoomPlayerCard"}
-              key={score.user_id || score.player_name}
-            >
-              <div className="liveRoomPlayerTop">
-                <div className="liveRoomPlayerIdentity">
-                  <div className="liveRoomAvatar">
-                    {isMe ? "나" : getInitial(score.player_name)}
-                  </div>
-                  <div>
-                    <strong>{score.player_name || "참가자"}</strong>
-                    {isMe && <span>내 점수</span>}
-                  </div>
-                </div>
-
-                <div className="liveRoomTotalBox">
-                  <span>총점</span>
-                  <strong>{score.total || 0}</strong>
-                </div>
-              </div>
-
-              <div className="liveRoomFrameStrip">
-                {Array.from({ length: 10 }, (_, index) => {
-                  const frame = (score.frames || [])[index];
-
-                  return (
-                    <div className="liveRoomFrameCell" key={index}>
-                      <div className="liveRoomFrameNo">{index + 1}</div>
-                      <div className="liveRoomFrameMark">
-                        {renderFrameMark(frame?.mark)}
-                      </div>
-                      <div className="liveRoomFrameTotal">
-                        {displayTotal(frame?.total)}
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            </article>
-          );
-        })}
-      </div>
+      )}
     </section>
   );
 }
