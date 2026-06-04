@@ -384,7 +384,29 @@ function getFrameCandidateRolls(frameNo, originalRolls = []) {
       }
     }
   } else {
+    const rawMark = String(originalRolls?.mark || "").toUpperCase();
     add(clean.slice(0, 3));
+
+    // 10프레임은 OCR이 X 3개를 1개로 압축하거나 9프레임과 섞는 경우가 많다.
+    // 누적 점수 교차검증에서 복구할 수 있도록 가능한 합법 10프레임 후보를 충분히 열어둔다.
+    add([10, 10, 10]);
+    add([10, 10, 0]);
+    add([10, 0, 10]);
+
+    for (let second = 0; second <= 10; second++) {
+      if (second === 10) {
+        for (let third = 0; third <= 10; third++) add([10, 10, third]);
+      } else {
+        for (let third = 0; third <= 10 - second; third++) add([10, second, third]);
+      }
+    }
+
+    for (let first = 0; first <= 9; first++) {
+      const spareSecond = 10 - first;
+      for (let third = 0; third <= 10; third++) add([first, spareSecond, third]);
+
+      for (let second = 0; second < spareSecond; second++) add([first, second]);
+    }
   }
 
   return candidates;
@@ -450,7 +472,7 @@ export function repairGeminiFramesByCumulativeScores(frames, fallbackRolls = [],
   bestPenalty = initial.penalty;
   bestRolls = initial.candidateRolls;
 
-  for (let frameIndex = 0; frameIndex < Math.min(9, groups.length); frameIndex++) {
+  for (let frameIndex = 0; frameIndex < Math.min(10, groups.length); frameIndex++) {
     const frameNo = frameIndex + 1;
     const candidates = getFrameCandidateRolls(frameNo, groups[frameIndex]);
 
@@ -462,6 +484,31 @@ export function repairGeminiFramesByCumulativeScores(frames, fallbackRolls = [],
         bestPenalty = result.penalty;
         bestRolls = result.candidateRolls;
         groups = nextGroups;
+      }
+    }
+  }
+
+
+  // 9~10프레임 경계가 붙어 보이는 점수판은 Gemini가 9프레임 X를 -/로,
+  // 10프레임 XXX를 X 하나로 줄이는 경우가 잦다. 두 프레임을 쌍으로 다시 평가한다.
+  if (groups.length >= 10 && targetScores.length >= 10) {
+    const ninthCandidates = getFrameCandidateRolls(9, groups[8]);
+    const tenthCandidates = getFrameCandidateRolls(10, groups[9]);
+
+    for (const ninthCandidate of ninthCandidates) {
+      for (const tenthCandidate of tenthCandidates) {
+        const nextGroups = groups.map((group, index) => {
+          if (index === 8) return ninthCandidate;
+          if (index === 9) return tenthCandidate;
+          return group;
+        });
+        const result = evaluate(nextGroups);
+
+        if (result.penalty < bestPenalty) {
+          bestPenalty = result.penalty;
+          bestRolls = result.candidateRolls;
+          groups = nextGroups;
+        }
       }
     }
   }

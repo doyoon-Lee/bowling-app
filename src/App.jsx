@@ -569,6 +569,26 @@ export default function App() {
         for (let first = 0; first <= 9; first++) {
           for (let second = 0; second <= 9 - first; second++) add([first, second]);
         }
+      } else {
+        add(clean.slice(0, 3));
+        add([10, 10, 10]);
+        add([10, 10, 0]);
+        add([10, 0, 10]);
+
+        for (let second = 0; second <= 10; second++) {
+          if (second === 10) {
+            for (let third = 0; third <= 10; third++) add([10, 10, third]);
+          } else {
+            for (let third = 0; third <= 10 - second; third++) add([10, second, third]);
+          }
+        }
+
+        for (let first = 0; first <= 9; first++) {
+          const spareSecond = 10 - first;
+          for (let third = 0; third <= 10; third++) add([first, spareSecond, third]);
+
+          for (let second = 0; second < spareSecond; second++) add([first, second]);
+        }
       }
 
       return candidates;
@@ -593,7 +613,7 @@ export default function App() {
     let groups = originalGroups;
     let best = evaluate(groups);
 
-    for (let frameIndex = 0; frameIndex < Math.min(9, groups.length); frameIndex++) {
+    for (let frameIndex = 0; frameIndex < Math.min(10, groups.length); frameIndex++) {
       const frameNo = frameIndex + 1;
       const candidates = getCandidates(frameNo, groups[frameIndex]);
 
@@ -604,6 +624,30 @@ export default function App() {
         if (result.penalty < best.penalty) {
           best = result;
           groups = nextGroups;
+        }
+      }
+    }
+
+
+    // 9~10프레임은 화면 우측 끝에서 붙어 보여 OCR 경계 오류가 가장 많이 발생한다.
+    // 두 프레임 후보를 동시에 평가해서 누적 점수와 맞는 조합을 우선 적용한다.
+    if (groups.length >= 10 && targetScores.length >= 10) {
+      const ninthCandidates = getCandidates(9, groups[8]);
+      const tenthCandidates = getCandidates(10, groups[9]);
+
+      for (const ninthCandidate of ninthCandidates) {
+        for (const tenthCandidate of tenthCandidates) {
+          const nextGroups = groups.map((group, index) => {
+            if (index === 8) return ninthCandidate;
+            if (index === 9) return tenthCandidate;
+            return group;
+          });
+          const result = evaluate(nextGroups);
+
+          if (result.penalty < best.penalty) {
+            best = result;
+            groups = nextGroups;
+          }
         }
       }
     }
