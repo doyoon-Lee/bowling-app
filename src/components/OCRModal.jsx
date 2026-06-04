@@ -8,7 +8,6 @@ export default function OCRModal({
   cropBox,
   currentCropBox,
   setCropMode,
-  setQuickCrop,
   resetCropSelection,
   startCropSelection,
   moveCropSelection,
@@ -38,9 +37,6 @@ export default function OCRModal({
               <button type="button" onClick={() => setCropMode((prev) => !prev)}>
                 {cropMode ? "영역 선택 끄기" : "내 점수 영역 선택"}
               </button>
-              <button type="button" onClick={() => setQuickCrop("top")}>상단</button>
-              <button type="button" onClick={() => setQuickCrop("middle")}>중단</button>
-              <button type="button" onClick={() => setQuickCrop("bottom")}>하단</button>
               <button type="button" onClick={resetCropSelection}>전체</button>
             </div>
 
@@ -69,7 +65,7 @@ export default function OCRModal({
             </div>
 
             <p className="cropGuide">
-              여러 명 점수판이면 내 점수 줄만 드래그하거나 상단/중단/하단을 선택한 뒤 분석하세요.
+              여러 명 점수판이면 내 점수 줄만 직접 드래그해서 선택한 뒤 분석하세요.
               {cropBox ? " 현재 선택 영역만 분석합니다." : " 영역 미선택 시 전체 사진을 분석합니다."}
             </p>
           </div>

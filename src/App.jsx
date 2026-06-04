@@ -506,13 +506,6 @@ export default function App() {
     if (nextBox) setCropBox(nextBox);
     setCropDrag(null);
   };
-
-  const setQuickCrop = (position) => {
-    const presets = {
-      top: { x: 0.04, y: 0.05, width: 0.92, height: 0.3 },
-      middle: { x: 0.04, y: 0.35, width: 0.92, height: 0.3 },
-      bottom: { x: 0.04, y: 0.65, width: 0.92, height: 0.3 },
-    };
     setCropMode(true);
     setCropDrag(null);
     setCropBox(presets[position]);
@@ -953,7 +946,6 @@ export default function App() {
             cropBox={cropBox}
             currentCropBox={currentCropBox}
             setCropMode={setCropMode}
-            setQuickCrop={setQuickCrop}
             resetCropSelection={resetCropSelection}
             startCropSelection={startCropSelection}
             moveCropSelection={moveCropSelection}
