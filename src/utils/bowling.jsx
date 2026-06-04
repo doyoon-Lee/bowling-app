@@ -390,7 +390,7 @@ function getFrameCandidateRolls(frameNo, originalRolls = []) {
   return candidates;
 }
 
-function getCumulativeScoresFromData(data) {
+export function getCumulativeScoresFromData(data) {
   const fromData = Array.isArray(data?.cumulativeScores)
     ? data.cumulativeScores
         .map((score) => Number(score))
@@ -410,7 +410,7 @@ function getCumulativeScoresFromData(data) {
   return fromFrames.slice(0, 10);
 }
 
-function repairGeminiFramesByCumulativeScores(frames, fallbackRolls = [], cumulativeScores = []) {
+export function repairGeminiFramesByCumulativeScores(frames, fallbackRolls = [], cumulativeScores = []) {
   if (!Array.isArray(frames) || frames.length === 0 || !Array.isArray(cumulativeScores) || cumulativeScores.length === 0) {
     return fallbackRolls;
   }
@@ -469,7 +469,7 @@ function repairGeminiFramesByCumulativeScores(frames, fallbackRolls = [], cumula
   return bestPenalty <= initial.penalty ? bestRolls.slice(0, 21) : fallbackRolls;
 }
 
-function normalizeGeminiRollsFromFrames(frames, fallbackRolls = []) {
+export function normalizeGeminiRollsFromFrames(frames, fallbackRolls = []) {
   if (!Array.isArray(frames) || frames.length === 0) return fallbackRolls;
 
   const rebuilt = [];
