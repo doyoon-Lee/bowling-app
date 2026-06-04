@@ -770,9 +770,7 @@ export default function App() {
         data.finalScore,
         cumulativeScores
       );
-      const previewFrames = Array.isArray(data.frames) && data.frames.length > 0
-        ? data.frames
-        : calcBowlingScore(repairedRolls).frames;
+      const previewFrames = calcBowlingScore(repairedRolls).frames;
 
       setOcrPreviewRolls(repairedRolls);
       setGeminiPreviewFrames(previewFrames);

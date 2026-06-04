@@ -1938,3 +1938,21 @@ body {
     max-height: 300px;
   }
 }
+
+
+/* Crop toolbar simplified: drag only */
+.cropToolbar {
+  display: grid;
+  grid-template-columns: 1fr 80px;
+  gap: 8px;
+}
+
+.cropToolbar button {
+  white-space: nowrap;
+}
+
+@media (max-width: 520px) {
+  .cropToolbar {
+    grid-template-columns: 1fr 70px;
+  }
+}
