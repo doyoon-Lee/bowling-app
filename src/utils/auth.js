@@ -10,15 +10,29 @@ export function isGuestUser(user) {
 }
 
 export function getDisplayUserName(user) {
-  return (
-    user?.user_metadata?.guest_name ||
-    user?.email ||
-    user?.user_metadata?.email ||
-    user?.user_metadata?.full_name ||
-    user?.user_metadata?.name ||
-    user?.user_metadata?.nickname ||
-    "로그인 사용자"
-  );
+  const metadata = user?.user_metadata || {};
+  const identityData = user?.identities?.[0]?.identity_data || {};
+
+  const candidates = [
+    metadata.guest_name,
+    metadata.nickname,
+    metadata.name,
+    metadata.full_name,
+    metadata.preferred_username,
+    identityData.nickname,
+    identityData.name,
+    identityData.full_name,
+    identityData.preferred_username,
+    metadata.email,
+    user?.email,
+  ];
+
+  const displayName = candidates.find((value) => typeof value === "string" && value.trim());
+
+  if (!displayName) return "로그인 사용자";
+
+  const trimmed = displayName.trim();
+  return trimmed.includes("@") ? trimmed.split("@")[0] : trimmed;
 }
 
 export function isInAppBrowser() {

@@ -27,6 +27,79 @@ import {createRoom, findRoomByCode, joinRoomById, upsertRoomScore } from "./util
 import { groupRecordsByDate } from "./utils/date";
 import { getCachedSupabaseClient, getSupabaseClient } from "./utils/supabaseClient";
 
+const BOWLING_RECORDS_CACHE_KEY = "bowling_score_records_cache_v1";
+
+function safeParseJson(value, fallback) {
+  try {
+    return value ? JSON.parse(value) : fallback;
+  } catch {
+    return fallback;
+  }
+}
+
+function normalizeRecordList(records) {
+  if (!Array.isArray(records)) return [];
+
+  const uniqueRecords = new Map();
+
+  records.forEach((record) => {
+    if (!record) return;
+
+    const recordId = record.id || `local-${record.created_at || Date.now()}-${record.total || 0}`;
+    uniqueRecords.set(recordId, { ...record, id: recordId });
+  });
+
+  return Array.from(uniqueRecords.values()).sort((a, b) => {
+    const nextTime = new Date(b.created_at || 0).getTime();
+    const prevTime = new Date(a.created_at || 0).getTime();
+    return nextTime - prevTime;
+  });
+}
+
+function readRecordsCache() {
+  if (typeof window === "undefined") return { byUserId: {}, byUserEmail: {} };
+
+  return safeParseJson(localStorage.getItem(BOWLING_RECORDS_CACHE_KEY), {
+    byUserId: {},
+    byUserEmail: {},
+  });
+}
+
+function writeRecordsCache(cache) {
+  if (typeof window === "undefined") return;
+  localStorage.setItem(BOWLING_RECORDS_CACHE_KEY, JSON.stringify(cache));
+}
+
+function getCachedRecordsForUser(user) {
+  if (!user) return [];
+
+  const cache = readRecordsCache();
+  const email = user.email || user.user_metadata?.email || user.user_metadata?.kakao_account?.email || "";
+
+  return normalizeRecordList([
+    ...(cache.byUserId?.[user.id] || []),
+    ...(email ? cache.byUserEmail?.[email] || [] : []),
+  ]);
+}
+
+function cacheRecordsForUser(user, records) {
+  if (!user) return;
+
+  const cache = readRecordsCache();
+  const normalizedRecords = normalizeRecordList(records);
+  const email = user.email || user.user_metadata?.email || user.user_metadata?.kakao_account?.email || "";
+
+  cache.byUserId = cache.byUserId || {};
+  cache.byUserEmail = cache.byUserEmail || {};
+  cache.byUserId[user.id] = normalizedRecords;
+
+  if (email) {
+    cache.byUserEmail[email] = normalizedRecords;
+  }
+
+  writeRecordsCache(cache);
+}
+
 export default function App() {
   const [session, setSession] = useState(null);
   const [authLoading, setAuthLoading] = useState(true);
@@ -64,6 +137,7 @@ export default function App() {
   const [isSaving, setIsSaving] = useState(false);
 
   const scoreboardRef = useRef(null);
+  const recordsCacheUserRef = useRef(null);
   const user = session?.user;
 
 
@@ -116,6 +190,64 @@ export default function App() {
     };
   }, []);
 
+
+  useEffect(() => {
+    if (!user) return;
+
+    setPlayerName((currentName) => {
+      if (currentName.trim()) return currentName;
+      return getDisplayUserName(user);
+    });
+  }, [user?.id]);
+
+  useEffect(() => {
+    if (!user) {
+      recordsCacheUserRef.current = null;
+      return;
+    }
+
+    recordsCacheUserRef.current = user.id;
+    setRecords(getCachedRecordsForUser(user));
+
+    let mounted = true;
+
+    async function loadRecords() {
+      const client = await getSupabaseClient();
+      if (!client) return;
+
+      const { data, error } = await client
+        .from("bowling_games")
+        .select("id, user_id, user_email, player_name, place, total, rolls, frames, created_at")
+        .eq("user_id", user.id)
+        .order("created_at", { ascending: false });
+
+      if (!mounted) return;
+
+      if (error) {
+        console.error("Load records error:", error);
+        return;
+      }
+
+      const mergedRecords = normalizeRecordList([
+        ...(data || []),
+        ...getCachedRecordsForUser(user),
+      ]);
+
+      setRecords(mergedRecords);
+      cacheRecordsForUser(user, mergedRecords);
+    }
+
+    loadRecords();
+
+    return () => {
+      mounted = false;
+    };
+  }, [user?.id]);
+
+  useEffect(() => {
+    if (!user || recordsCacheUserRef.current !== user.id) return;
+    cacheRecordsForUser(user, records);
+  }, [records, user?.id]);
 
   const result = useMemo(() => calcBowlingScore(rolls), [rolls]);
   const maxPossible = useMemo(() => calcMaxPossibleScore(rolls), [rolls]);
@@ -257,7 +389,6 @@ export default function App() {
     if (isGuestUser(user)) {
       localStorage.setItem(APP_LOGGED_OUT_KEY, "true");
       setSession(null);
-      setRecords([]);
       setRolls([]);
       setPinFrames([]);
       setPlayerName("");
@@ -266,7 +397,6 @@ export default function App() {
 
     localStorage.removeItem(APP_LOGGED_OUT_KEY);
     await client.auth.signOut();
-    setRecords([]);
     setRolls([]);
     setPinFrames([]);
     setPlayerName("");
