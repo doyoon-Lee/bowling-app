@@ -36,6 +36,7 @@ export default function App() {
   const [roomCode, setRoomCode] = useState("");
   const [roomPlayers, setRoomPlayers] = useState([]);
   const [roomScores, setRoomScores] = useState([]);
+  const roomChannelRef = useRef(null);
 
   const [playerName, setPlayerName] = useState("");
   const [place, setPlace] = useState("");
@@ -65,139 +66,63 @@ export default function App() {
   const scoreboardRef = useRef(null);
   const user = session?.user;
 
+
+  useEffect(() => {
+    let mounted = true;
+    let authSubscription = null;
+
+    const initAuth = async () => {
+      try {
+        const client = await getSupabaseClient();
+
+        if (!client) {
+          if (mounted) {
+            setSession(null);
+            setAuthLoading(false);
+          }
+          return;
+        }
+
+        const { data } = await client.auth.getSession();
+
+        if (mounted) {
+          setSession(data?.session || null);
+          setAuthLoading(false);
+        }
+
+        const { data: listener } = client.auth.onAuthStateChange((_event, nextSession) => {
+          if (!mounted) return;
+
+          setSession(nextSession || null);
+          setAuthLoading(false);
+        });
+
+        authSubscription = listener?.subscription || null;
+      } catch (error) {
+        console.error("Auth init error:", error);
+
+        if (mounted) {
+          setSession(null);
+          setAuthLoading(false);
+        }
+      }
+    };
+
+    initAuth();
+
+    return () => {
+      mounted = false;
+      authSubscription?.unsubscribe?.();
+    };
+  }, []);
+
+
   const result = useMemo(() => calcBowlingScore(rolls), [rolls]);
   const maxPossible = useMemo(() => calcMaxPossibleScore(rolls), [rolls]);
   const groupedRecords = useMemo(() => groupRecordsByDate(records), [records]);
   const sortedDateKeys = useMemo(() => Object.keys(groupedRecords).sort((a, b) => b.localeCompare(a)), [groupedRecords]);
   const next = getFrameRollLimit(rolls);
 
-  useEffect(() => {
-    return () => {
-      if (scoreImagePreviewUrl) URL.revokeObjectURL(scoreImagePreviewUrl);
-    };
-  }, [scoreImagePreviewUrl]);
-
-  useEffect(() => {
-    if (!scoreboardRef.current || !next) return;
-
-    const targetFrameIndex = Math.max(0, next.frame - 1);
-    const frameWidth = scoreboardRef.current.scrollWidth / 10;
-
-    scoreboardRef.current.scrollTo({
-      left: Math.max(0, frameWidth * targetFrameIndex - frameWidth),
-      behavior: "smooth",
-    });
-  }, [rolls.length, next?.frame]);
-
-  useEffect(() => {
-    let mounted = true;
-    let subscription;
-
-    async function initAuth() {
-      const client = await getSupabaseClient();
-      if (!client) {
-        setAuthLoading(false);
-        return;
-      }
-
-      const { data } = await client.auth.getSession();
-      if (!mounted) return;
-
-      const appLoggedOut = localStorage.getItem(APP_LOGGED_OUT_KEY) === "true";
-      const currentUser = data.session?.user;
-
-      if (appLoggedOut && isGuestUser(currentUser)) {
-        setSession(null);
-      } else {
-        setSession(data.session);
-      }
-
-      setAuthLoading(false);
-
-      const authListener = client.auth.onAuthStateChange((_event, nextSession) => {
-        const appLoggedOut = localStorage.getItem(APP_LOGGED_OUT_KEY) === "true";
-        const nextUser = nextSession?.user;
-
-        if (appLoggedOut && isGuestUser(nextUser)) {
-          setSession(null);
-          return;
-        }
-
-        setSession(nextSession);
-      });
-
-      subscription = authListener.data.subscription;
-    }
-
-    initAuth();
-
-    return () => {
-      mounted = false;
-      if (subscription) subscription.unsubscribe();
-    };
-  }, []);
-
-  useEffect(() => {
-    if (!user) return;
-
-    const defaultName =
-      user.user_metadata?.guest_name ||
-      user.user_metadata?.full_name ||
-      user.user_metadata?.name ||
-      user.user_metadata?.nickname ||
-      user.email?.split("@")[0] ||
-      "";
-
-    setPlayerName((prev) => prev || defaultName);
-  }, [user]);
-
-  useEffect(() => {
-    let channel;
-    let mounted = true;
-
-    async function loadRecords() {
-      const client = await getSupabaseClient();
-      if (!client || !user) {
-        setRecords([]);
-        return;
-      }
-
-      const fetchMyRecords = async () => {
-        const { data, error } = await client
-          .from("bowling_games")
-          .select("id, user_id, user_email, player_name, place, total, rolls, frames, created_at")
-          .eq("user_id", user.id)
-          .order("created_at", { ascending: false })
-          .limit(1000);
-
-        if (!error && data && mounted) setRecords(data);
-      };
-
-      await fetchMyRecords();
-
-      channel = client
-        .channel(`bowling-games-${user.id}`)
-        .on(
-          "postgres_changes",
-          {
-            event: "*",
-            schema: "public",
-            table: "bowling_games",
-            filter: `user_id=eq.${user.id}`,
-          },
-          fetchMyRecords
-        )
-        .subscribe();
-    }
-
-    loadRecords();
-
-    return () => {
-      mounted = false;
-      const cached = getCachedSupabaseClient();
-      if (channel && cached) cached.removeChannel(channel);
-    };
-  }, [user]);
 
   useEffect(() => {
     if (!roomId) {
@@ -391,7 +316,14 @@ export default function App() {
     }
   };
 
-  const handleLeaveRoom = () => {
+  const handleLeaveRoom = async () => {
+    const client = getCachedSupabaseClient();
+
+    if (client && roomChannelRef.current) {
+      await client.removeChannel(roomChannelRef.current);
+      roomChannelRef.current = null;
+    }
+
     setAppMode("solo");
     setRoomId(null);
     setRoomCode("");
