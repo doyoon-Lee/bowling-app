@@ -3,6 +3,16 @@ import { calcBowlingScore, getPreview, renderFrameMark } from "../utils/bowling.
 
 export default function OCRModal({
   scoreImage,
+  scoreImagePreviewUrl,
+  cropMode,
+  cropBox,
+  currentCropBox,
+  setCropMode,
+  setQuickCrop,
+  resetCropSelection,
+  startCropSelection,
+  moveCropSelection,
+  endCropSelection,
   cameraMessage,
   ocrPreviewRolls,
   geminiPreviewFrames,
@@ -23,7 +33,46 @@ export default function OCRModal({
         </div>
 
         {scoreImage && (
-          <img className="scoreImagePreview" src={URL.createObjectURL(scoreImage)} alt="점수판 미리보기" />
+          <div className="cropPanel">
+            <div className="cropToolbar">
+              <button type="button" onClick={() => setCropMode((prev) => !prev)}>
+                {cropMode ? "영역 선택 끄기" : "내 점수 영역 선택"}
+              </button>
+              <button type="button" onClick={() => setQuickCrop("top")}>상단</button>
+              <button type="button" onClick={() => setQuickCrop("middle")}>중단</button>
+              <button type="button" onClick={() => setQuickCrop("bottom")}>하단</button>
+              <button type="button" onClick={resetCropSelection}>전체</button>
+            </div>
+
+            <div
+              className={cropMode ? "cropImageWrap selecting" : "cropImageWrap"}
+              onMouseDown={startCropSelection}
+              onMouseMove={moveCropSelection}
+              onMouseUp={endCropSelection}
+              onMouseLeave={endCropSelection}
+              onTouchStart={startCropSelection}
+              onTouchMove={moveCropSelection}
+              onTouchEnd={endCropSelection}
+            >
+              <img className="scoreImagePreview" src={scoreImagePreviewUrl} alt="점수판 미리보기" draggable={false} />
+              {currentCropBox && (
+                <div
+                  className="cropSelectionBox"
+                  style={{
+                    left: `${currentCropBox.x * 100}%`,
+                    top: `${currentCropBox.y * 100}%`,
+                    width: `${currentCropBox.width * 100}%`,
+                    height: `${currentCropBox.height * 100}%`,
+                  }}
+                />
+              )}
+            </div>
+
+            <p className="cropGuide">
+              여러 명 점수판이면 내 점수 줄만 드래그하거나 상단/중단/하단을 선택한 뒤 분석하세요.
+              {cropBox ? " 현재 선택 영역만 분석합니다." : " 영역 미선택 시 전체 사진을 분석합니다."}
+            </p>
+          </div>
         )}
 
         {cameraMessage && <div className="placeMessage">{cameraMessage}</div>}

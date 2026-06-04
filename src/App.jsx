@@ -35,6 +35,10 @@ export default function App() {
   const [placeSearchMessage, setPlaceSearchMessage] = useState("");
 
   const [scoreImage, setScoreImage] = useState(null);
+  const [scoreImagePreviewUrl, setScoreImagePreviewUrl] = useState("");
+  const [cropMode, setCropMode] = useState(false);
+  const [cropBox, setCropBox] = useState(null);
+  const [cropDrag, setCropDrag] = useState(null);
   const [isCameraModalOpen, setIsCameraModalOpen] = useState(false);
   const [isAnalyzingScoreImage, setIsAnalyzingScoreImage] = useState(false);
   const [cameraMessage, setCameraMessage] = useState("");
@@ -56,6 +60,12 @@ export default function App() {
   const groupedRecords = useMemo(() => groupRecordsByDate(records), [records]);
   const sortedDateKeys = useMemo(() => Object.keys(groupedRecords).sort((a, b) => b.localeCompare(a)), [groupedRecords]);
   const next = getFrameRollLimit(rolls);
+
+  useEffect(() => {
+    return () => {
+      if (scoreImagePreviewUrl) URL.revokeObjectURL(scoreImagePreviewUrl);
+    };
+  }, [scoreImagePreviewUrl]);
 
   useEffect(() => {
     if (!scoreboardRef.current || !next) return;
@@ -453,11 +463,124 @@ export default function App() {
     setIsPlaceModalOpen(false);
   };
 
+
+  const getImagePointerPosition = (event) => {
+    const rect = event.currentTarget.getBoundingClientRect();
+    const point = event.touches?.[0] || event.changedTouches?.[0] || event;
+    return {
+      x: Math.max(0, Math.min(1, (point.clientX - rect.left) / rect.width)),
+      y: Math.max(0, Math.min(1, (point.clientY - rect.top) / rect.height)),
+    };
+  };
+
+  const normalizeCropBox = (start, end) => {
+    if (!start || !end) return null;
+    const x = Math.min(start.x, end.x);
+    const y = Math.min(start.y, end.y);
+    const width = Math.abs(start.x - end.x);
+    const height = Math.abs(start.y - end.y);
+    if (width < 0.03 || height < 0.03) return null;
+    return { x, y, width, height };
+  };
+
+  const startCropSelection = (event) => {
+    if (!cropMode) return;
+    event.preventDefault();
+    const position = getImagePointerPosition(event);
+    setCropDrag({ start: position, current: position });
+    setCropBox(null);
+  };
+
+  const moveCropSelection = (event) => {
+    if (!cropMode || !cropDrag) return;
+    event.preventDefault();
+    const position = getImagePointerPosition(event);
+    setCropDrag((prev) => ({ ...prev, current: position }));
+  };
+
+  const endCropSelection = (event) => {
+    if (!cropMode || !cropDrag) return;
+    event.preventDefault();
+    const position = getImagePointerPosition(event);
+    const nextBox = normalizeCropBox(cropDrag.start, position);
+    if (nextBox) setCropBox(nextBox);
+    setCropDrag(null);
+  };
+
+  const setQuickCrop = (position) => {
+    const presets = {
+      top: { x: 0.04, y: 0.05, width: 0.92, height: 0.3 },
+      middle: { x: 0.04, y: 0.35, width: 0.92, height: 0.3 },
+      bottom: { x: 0.04, y: 0.65, width: 0.92, height: 0.3 },
+    };
+    setCropMode(true);
+    setCropDrag(null);
+    setCropBox(presets[position]);
+  };
+
+  const resetCropSelection = () => {
+    setCropBox(null);
+    setCropDrag(null);
+    setCropMode(false);
+  };
+
+  const createCroppedScoreImageFile = async () => {
+    if (!scoreImage || !cropBox) return scoreImage;
+
+    const imageUrl = URL.createObjectURL(scoreImage);
+    try {
+      const image = await new Promise((resolve, reject) => {
+        const img = new Image();
+        img.onload = () => resolve(img);
+        img.onerror = reject;
+        img.src = imageUrl;
+      });
+
+      const sourceX = Math.round(image.naturalWidth * cropBox.x);
+      const sourceY = Math.round(image.naturalHeight * cropBox.y);
+      const sourceWidth = Math.round(image.naturalWidth * cropBox.width);
+      const sourceHeight = Math.round(image.naturalHeight * cropBox.height);
+
+      const canvas = document.createElement("canvas");
+      canvas.width = sourceWidth;
+      canvas.height = sourceHeight;
+
+      canvas.getContext("2d").drawImage(
+        image,
+        sourceX,
+        sourceY,
+        sourceWidth,
+        sourceHeight,
+        0,
+        0,
+        sourceWidth,
+        sourceHeight
+      );
+
+      const blob = await new Promise((resolve) => {
+        canvas.toBlob((nextBlob) => resolve(nextBlob), "image/jpeg", 0.95);
+      });
+
+      if (!blob) return scoreImage;
+      return new File([blob], `cropped-${scoreImage.name || "score.jpg"}`, { type: "image/jpeg" });
+    } finally {
+      URL.revokeObjectURL(imageUrl);
+    }
+  };
+
+  const currentCropBox = cropDrag ? normalizeCropBox(cropDrag.start, cropDrag.current) : cropBox;
+
   const handleScoreImageChange = (event) => {
     const file = event.target.files?.[0];
     if (!file) return;
 
+    if (scoreImagePreviewUrl) URL.revokeObjectURL(scoreImagePreviewUrl);
+
     setScoreImage(file);
+    setScoreImagePreviewUrl(URL.createObjectURL(file));
+    setCropMode(false);
+    setCropBox(null);
+    setCropDrag(null);
     setCameraMessage("");
     setOcrPreviewRolls([]);
     setOcrRawText("");
@@ -485,7 +608,9 @@ export default function App() {
 
     try {
       const formData = new FormData();
-      formData.append("image", scoreImage);
+      const imageForAnalysis = await createCroppedScoreImageFile();
+      formData.append("image", imageForAnalysis);
+      formData.append("is_cropped_score_row", cropBox ? "true" : "false");
 
       if (ocrPreviewRolls.length > 0 || geminiPreviewFrames.length > 0) {
         formData.append(
@@ -578,7 +703,13 @@ export default function App() {
 
     setRolls(ocrPreviewRolls);
     setIsCameraModalOpen(false);
+    if (scoreImagePreviewUrl) URL.revokeObjectURL(scoreImagePreviewUrl);
+
     setScoreImage(null);
+    setScoreImagePreviewUrl("");
+    setCropMode(false);
+    setCropBox(null);
+    setCropDrag(null);
     setCameraMessage("");
     setOcrPreviewRolls([]);
     setOcrRawText("");
@@ -817,6 +948,16 @@ export default function App() {
         {isCameraModalOpen && (
           <OCRModal
             scoreImage={scoreImage}
+            scoreImagePreviewUrl={scoreImagePreviewUrl}
+            cropMode={cropMode}
+            cropBox={cropBox}
+            currentCropBox={currentCropBox}
+            setCropMode={setCropMode}
+            setQuickCrop={setQuickCrop}
+            resetCropSelection={resetCropSelection}
+            startCropSelection={startCropSelection}
+            moveCropSelection={moveCropSelection}
+            endCropSelection={endCropSelection}
             cameraMessage={cameraMessage}
             ocrPreviewRolls={ocrPreviewRolls}
             geminiPreviewFrames={geminiPreviewFrames}

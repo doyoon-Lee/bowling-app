@@ -1859,3 +1859,82 @@ body {
     gap: 4px !important;
   }
 }
+
+
+/* Score image crop selector */
+.cropPanel {
+  margin-top: 8px;
+}
+
+.cropToolbar {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+  margin-bottom: 8px;
+}
+
+.cropToolbar button {
+  border: none;
+  border-radius: 999px;
+  background: #e0f2fe;
+  color: #0369a1;
+  padding: 7px 10px;
+  font-size: 11px;
+  font-weight: 900;
+}
+
+.cropImageWrap {
+  position: relative;
+  width: 100%;
+  border-radius: 16px;
+  overflow: hidden;
+  background: #0f172a;
+  border: 1px solid #e2e8f0;
+  touch-action: none;
+  user-select: none;
+}
+
+.cropImageWrap.selecting {
+  cursor: crosshair;
+}
+
+.cropImageWrap .scoreImagePreview {
+  display: block;
+  width: 100%;
+  max-height: 340px;
+  object-fit: contain;
+  border-radius: 0;
+  border: none;
+  background: #0f172a;
+  pointer-events: none;
+}
+
+.cropSelectionBox {
+  position: absolute;
+  border: 2px solid #facc15;
+  background: rgba(250, 204, 21, 0.16);
+  box-shadow: 0 0 0 9999px rgba(15, 23, 42, 0.45);
+  pointer-events: none;
+}
+
+.cropGuide {
+  margin: 8px 0 0;
+  color: #64748b;
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+@media (max-width: 520px) {
+  .cropToolbar {
+    gap: 5px;
+  }
+
+  .cropToolbar button {
+    padding: 6px 8px;
+    font-size: 10px;
+  }
+
+  .cropImageWrap .scoreImagePreview {
+    max-height: 300px;
+  }
+}
