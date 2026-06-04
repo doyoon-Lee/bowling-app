@@ -506,10 +506,6 @@ export default function App() {
     if (nextBox) setCropBox(nextBox);
     setCropDrag(null);
   };
-    setCropMode(true);
-    setCropDrag(null);
-    setCropBox(presets[position]);
-  };
 
   const resetCropSelection = () => {
     setCropBox(null);
@@ -581,6 +577,100 @@ export default function App() {
     setAnalysisAttempt(0);
     setIsCameraModalOpen(true);
   };
+
+
+  const getCumulativeScoresFromData = (data) => {
+    const fromData = Array.isArray(data?.cumulativeScores)
+      ? data.cumulativeScores.map((score) => Number(score)).filter((score) => Number.isFinite(score))
+      : [];
+
+    if (fromData.length > 0) return fromData.slice(0, 10);
+
+    const fromFrames = Array.isArray(data?.frames)
+      ? data.frames
+          .slice()
+          .sort((a, b) => Number(a.frame || 0) - Number(b.frame || 0))
+          .map((frame) => Number(frame.total ?? frame.score ?? frame.cumulativeScore))
+          .filter((score) => Number.isFinite(score))
+      : [];
+
+    return fromFrames.slice(0, 10);
+  };
+
+  const repairGeminiFramesByCumulativeScores = (frames, fallbackRolls = [], cumulativeScores = []) => {
+    if (!Array.isArray(frames) || frames.length === 0 || !Array.isArray(cumulativeScores) || cumulativeScores.length === 0) {
+      return fallbackRolls;
+    }
+
+    const sortedFrames = frames.slice().sort((a, b) => Number(a.frame || 0) - Number(b.frame || 0));
+    const originalGroups = sortedFrames.map((frame) => parseGeminiFrameRolls(frame));
+    const targetScores = cumulativeScores.map((score) => Number(score));
+
+    const buildRolls = (groups) => groups.flatMap((group) => group || []).slice(0, 21);
+
+    const getCandidates = (frameNo, originalRolls = []) => {
+      const candidates = [];
+      const add = (rolls) => {
+        const key = rolls.join(",");
+        if (!candidates.some((candidate) => candidate.join(",") === key)) candidates.push(rolls);
+      };
+
+      const clean = originalRolls
+        .map((roll) => Number(roll))
+        .filter((roll) => Number.isInteger(roll) && roll >= 0 && roll <= 10);
+
+      if (clean.length) add(clean);
+
+      if (frameNo < 10) {
+        add([10]);
+
+        for (let first = 0; first <= 9; first++) add([first, 10 - first]);
+
+        for (let first = 0; first <= 9; first++) {
+          for (let second = 0; second <= 9 - first; second++) add([first, second]);
+        }
+      }
+
+      return candidates;
+    };
+
+    const evaluate = (groups) => {
+      const candidateRolls = buildRolls(groups);
+      const scoreResult = calcBowlingScore(candidateRolls);
+      let penalty = 0;
+
+      for (let i = 0; i < Math.min(10, targetScores.length); i++) {
+        const target = targetScores[i];
+        if (!Number.isFinite(target)) continue;
+
+        const actual = Number(scoreResult.frames[i]?.total);
+        penalty += Number.isFinite(actual) ? Math.abs(actual - target) : 50;
+      }
+
+      return { penalty, candidateRolls };
+    };
+
+    let groups = originalGroups;
+    let best = evaluate(groups);
+
+    for (let frameIndex = 0; frameIndex < Math.min(9, groups.length); frameIndex++) {
+      const frameNo = frameIndex + 1;
+      const candidates = getCandidates(frameNo, groups[frameIndex]);
+
+      for (const candidate of candidates) {
+        const nextGroups = groups.map((group, index) => (index === frameIndex ? candidate : group));
+        const result = evaluate(nextGroups);
+
+        if (result.penalty < best.penalty) {
+          best = result;
+          groups = nextGroups;
+        }
+      }
+    }
+
+    return best.candidateRolls.slice(0, 21);
+  };
+
 
   const analyzeScoreImage = async () => {
     if (!scoreImage) {
@@ -667,12 +757,18 @@ export default function App() {
         return;
       }
 
+      const cumulativeScores = getCumulativeScoresFromData(data);
       const frameBasedRolls = normalizeGeminiRollsFromFrames(data.frames, data.rolls);
-      const repairedRolls = repairTenthFrameRolls(
+      const scoreCheckedRolls = repairGeminiFramesByCumulativeScores(
+        data.frames,
         frameBasedRolls,
+        cumulativeScores
+      );
+      const repairedRolls = repairTenthFrameRolls(
+        scoreCheckedRolls,
         data.frames,
         data.finalScore,
-        data.cumulativeScores
+        cumulativeScores
       );
       const previewFrames = Array.isArray(data.frames) && data.frames.length > 0
         ? data.frames

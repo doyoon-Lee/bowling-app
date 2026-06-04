@@ -320,7 +320,156 @@ export function parseGeminiFrameRolls(frame) {
   return rolls.length > 0 ? rolls.slice(0, 3) : fallback.slice(0, 3);
 }
 
-export function normalizeGeminiRollsFromFrames(frames, fallbackRolls = []) {
+export 
+function rollsToFrameRollGroups(rolls) {
+  const groups = [];
+  let rollIndex = 0;
+
+  for (let frame = 1; frame <= 10; frame++) {
+    if (frame < 10) {
+      const first = rolls[rollIndex];
+
+      if (first === undefined) {
+        groups.push([]);
+        continue;
+      }
+
+      if (first === 10) {
+        groups.push([10]);
+        rollIndex += 1;
+        continue;
+      }
+
+      const second = rolls[rollIndex + 1];
+      groups.push(second === undefined ? [first] : [first, second]);
+      rollIndex += 2;
+      continue;
+    }
+
+    groups.push(rolls.slice(rollIndex, rollIndex + 3));
+  }
+
+  return groups;
+}
+
+function buildRollsFromFrameRollGroups(groups) {
+  return groups.flatMap((group) => group || []).slice(0, 21);
+}
+
+function getFrameCandidateRolls(frameNo, originalRolls = []) {
+  const candidates = [];
+  const add = (rolls) => {
+    const key = rolls.join(",");
+    if (!candidates.some((candidate) => candidate.join(",") === key)) {
+      candidates.push(rolls);
+    }
+  };
+
+  const clean = originalRolls
+    .map((roll) => Number(roll))
+    .filter((roll) => Number.isInteger(roll) && roll >= 0 && roll <= 10);
+
+  if (clean.length) add(clean);
+
+  if (frameNo < 10) {
+    add([10]);
+
+    for (let first = 0; first <= 9; first++) {
+      add([first, 10 - first]);
+    }
+
+    for (let first = 0; first <= 9; first++) {
+      for (let second = 0; second <= 9 - first; second++) {
+        add([first, second]);
+      }
+    }
+  } else {
+    add(clean.slice(0, 3));
+  }
+
+  return candidates;
+}
+
+function getCumulativeScoresFromData(data) {
+  const fromData = Array.isArray(data?.cumulativeScores)
+    ? data.cumulativeScores
+        .map((score) => Number(score))
+        .filter((score) => Number.isFinite(score))
+    : [];
+
+  if (fromData.length > 0) return fromData.slice(0, 10);
+
+  const fromFrames = Array.isArray(data?.frames)
+    ? data.frames
+        .slice()
+        .sort((a, b) => Number(a.frame || 0) - Number(b.frame || 0))
+        .map((frame) => Number(frame.total ?? frame.score ?? frame.cumulativeScore))
+        .filter((score) => Number.isFinite(score))
+    : [];
+
+  return fromFrames.slice(0, 10);
+}
+
+function repairGeminiFramesByCumulativeScores(frames, fallbackRolls = [], cumulativeScores = []) {
+  if (!Array.isArray(frames) || frames.length === 0 || !Array.isArray(cumulativeScores) || cumulativeScores.length === 0) {
+    return fallbackRolls;
+  }
+
+  const sortedFrames = frames
+    .slice()
+    .sort((a, b) => Number(a.frame || 0) - Number(b.frame || 0));
+
+  let groups = sortedFrames.map((frame) => parseGeminiFrameRolls(frame));
+  let bestRolls = buildRollsFromFrameRollGroups(groups);
+  let bestPenalty = Number.POSITIVE_INFINITY;
+
+  const targetScores = cumulativeScores.map((score) => Number(score));
+
+  const evaluate = (nextGroups) => {
+    const candidateRolls = buildRollsFromFrameRollGroups(nextGroups);
+    const scoreResult = calcBowlingScore(candidateRolls);
+    let penalty = 0;
+
+    for (let i = 0; i < Math.min(10, targetScores.length); i++) {
+      const target = targetScores[i];
+      if (!Number.isFinite(target)) continue;
+
+      const actual = Number(scoreResult.frames[i]?.total);
+      if (!Number.isFinite(actual)) {
+        penalty += 50;
+        continue;
+      }
+
+      penalty += Math.abs(actual - target);
+    }
+
+    return { penalty, candidateRolls };
+  };
+
+  const initial = evaluate(groups);
+  bestPenalty = initial.penalty;
+  bestRolls = initial.candidateRolls;
+
+  for (let frameIndex = 0; frameIndex < Math.min(9, groups.length); frameIndex++) {
+    const frameNo = frameIndex + 1;
+    const candidates = getFrameCandidateRolls(frameNo, groups[frameIndex]);
+
+    for (const candidate of candidates) {
+      const nextGroups = groups.map((group, index) => (index === frameIndex ? candidate : group));
+      const result = evaluate(nextGroups);
+
+      if (result.penalty < bestPenalty) {
+        bestPenalty = result.penalty;
+        bestRolls = result.candidateRolls;
+        groups = nextGroups;
+      }
+    }
+  }
+
+  return bestPenalty <= initial.penalty ? bestRolls.slice(0, 21) : fallbackRolls;
+}
+
+function normalizeGeminiRollsFromFrames(frames, fallbackRolls = []) {
   if (!Array.isArray(frames) || frames.length === 0) return fallbackRolls;
 
   const rebuilt = [];
