@@ -1,12 +1,16 @@
+import React, { useEffect, useMemo, useRef, useState } from "react";
+import "./App.css";
+
 import {
+  calcBowlingScore,
+  calcMaxPossibleScore,
+  getFrameRollLimit,
   parseGeminiFrameRolls,
   normalizeGeminiRollsFromFrames,
   repairTenthFrameRolls,
   getCumulativeScoresFromData,
   repairGeminiFramesByCumulativeScores,
 } from "./utils/bowling";
-import React, { useEffect, useMemo, useRef, useState } from "react";
-import "./App.css";
 
 import AuthScreen from "./components/AuthScreen";
 import BeginnerKeypad from "./components/BeginnerKeypad";
@@ -19,7 +23,6 @@ import ProMode from "./components/ProMode";
 import Scoreboard from "./components/Scoreboard";
 
 import { APP_LOGGED_OUT_KEY, createGuestName, getDisplayUserName, isGuestUser, isInAppBrowser, openCurrentPageInExternalBrowser } from "./utils/auth";
-import { calcBowlingScore, calcMaxPossibleScore, getFrameRollLimit, normalizeGeminiRollsFromFrames, repairTenthFrameRolls } from "./utils/bowling.jsx";
 import {createRoom, findRoomByCode, joinRoomById, upsertRoomScore } from "./utils/room";
 import { groupRecordsByDate } from "./utils/date";
 import { getCachedSupabaseClient, getSupabaseClient } from "./utils/supabaseClient";
@@ -470,7 +473,6 @@ export default function App() {
     setIsPlaceModalOpen(false);
   };
 
-
   const getImagePointerPosition = (event) => {
     const rect = event.currentTarget.getBoundingClientRect();
     const point = event.touches?.[0] || event.changedTouches?.[0] || event;
@@ -585,7 +587,6 @@ export default function App() {
     setIsCameraModalOpen(true);
   };
 
-
   const getCumulativeScoresFromData = (data) => {
     const fromData = Array.isArray(data?.cumulativeScores)
       ? data.cumulativeScores.map((score) => Number(score)).filter((score) => Number.isFinite(score))
@@ -677,7 +678,6 @@ export default function App() {
 
     return best.candidateRolls.slice(0, 21);
   };
-
 
   const analyzeScoreImage = async () => {
     if (!scoreImage) {
@@ -810,7 +810,6 @@ export default function App() {
     setGeminiPreviewFrames([]);
     setAnalysisAttempt(0);
   };
-
 
   const syncRoomScoreLive = async (nextRolls) => {
     if (appMode !== "room" || !roomId || !user) return;
