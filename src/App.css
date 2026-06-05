@@ -2941,3 +2941,176 @@ body {
     padding: 22px 18px 18px;
   }
 }
+
+.roomNoticeBackdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 1250;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 18px;
+  background: rgba(15, 23, 42, 0.52);
+  backdrop-filter: blur(8px);
+}
+
+.roomNoticeModal {
+  width: min(430px, calc(100vw - 32px));
+  border: 1px solid rgba(226, 232, 240, 0.95);
+  border-radius: 28px;
+  background: #ffffff;
+  box-shadow: 0 26px 72px rgba(15, 23, 42, 0.3);
+  padding: 24px;
+  text-align: center;
+}
+
+.roomNoticeIcon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 66px;
+  height: 66px;
+  margin-bottom: 14px;
+  border-radius: 24px;
+  background: linear-gradient(135deg, #dcfce7, #dbeafe);
+  font-size: 34px;
+}
+
+.roomNoticeModal.ready .roomNoticeIcon {
+  background: linear-gradient(135deg, #fef3c7, #e0f2fe);
+}
+
+.roomNoticeHeader span {
+  display: inline-flex;
+  border-radius: 999px;
+  background: #e0f2fe;
+  color: #0369a1;
+  padding: 6px 12px;
+  font-size: 12px;
+  font-weight: 900;
+}
+
+.roomNoticeModal.success .roomNoticeHeader span {
+  background: #dcfce7;
+  color: #15803d;
+}
+
+.roomNoticeModal.ready .roomNoticeHeader span {
+  background: #fef3c7;
+  color: #92400e;
+}
+
+.roomNoticeHeader h2 {
+  margin: 12px 0 8px;
+  color: #0f172a;
+  font-size: 22px;
+  line-height: 1.25;
+}
+
+.roomNoticeHeader p {
+  margin: 0;
+  color: #64748b;
+  font-size: 14px;
+  line-height: 1.55;
+}
+
+.roomNoticeDetail {
+  margin: 18px 0 0;
+  border: 1px solid #e2e8f0;
+  border-radius: 18px;
+  background: #f8fafc;
+  color: #334155;
+  padding: 13px 14px;
+  font-size: 14px;
+  font-weight: 800;
+  line-height: 1.45;
+}
+
+.roomNoticeConfirm {
+  width: 100%;
+  margin-top: 20px;
+  border: 0;
+  border-radius: 18px;
+  background: #2563eb;
+  color: #ffffff;
+  padding: 15px 16px;
+  font-size: 16px;
+  font-weight: 900;
+  cursor: pointer;
+}
+
+.roundStartedToast {
+  position: fixed;
+  left: 50%;
+  bottom: 24px;
+  z-index: 1230;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: min(440px, calc(100vw - 32px));
+  transform: translateX(-50%);
+  border: 1px solid rgba(226, 232, 240, 0.95);
+  border-radius: 22px;
+  background: #ffffff;
+  box-shadow: 0 18px 50px rgba(15, 23, 42, 0.22);
+  padding: 14px 14px 14px 16px;
+}
+
+.roundStartedToastIcon {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 46px;
+  height: 46px;
+  border-radius: 18px;
+  background: #e0f2fe;
+  font-size: 24px;
+}
+
+.roundStartedToast strong {
+  display: block;
+  color: #0f172a;
+  font-size: 15px;
+  font-weight: 900;
+}
+
+.roundStartedToast p {
+  margin: 3px 0 0;
+  color: #64748b;
+  font-size: 13px;
+  line-height: 1.35;
+}
+
+.roundStartedToast button {
+  flex: 0 0 auto;
+  margin-left: auto;
+  border: 0;
+  border-radius: 999px;
+  background: #f1f5f9;
+  color: #475569;
+  width: 32px;
+  height: 32px;
+  font-size: 22px;
+  line-height: 1;
+  cursor: pointer;
+}
+
+@media (max-width: 480px) {
+  .roomNoticeBackdrop {
+    align-items: flex-end;
+    padding: 12px;
+  }
+
+  .roomNoticeModal {
+    width: 100%;
+    border-radius: 26px;
+    padding: 22px 18px 18px;
+  }
+
+  .roundStartedToast {
+    bottom: 14px;
+    width: calc(100vw - 24px);
+    border-radius: 20px;
+  }
+}

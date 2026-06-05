@@ -182,7 +182,7 @@ export async function deleteRoomPlayerScore(client, { roomId, userId, currentRou
   if (error) throw error;
 }
 
-export async function saveRoomGameRound(client, { roomId, roomCode, roundNumber, players, scores, betRule, settlement }) {
+export async function saveRoomGameRound(client, { roomId, roomCode, roundNumber, players, scores, betRule, settlement, savedBy }) {
   if (!roomId || !roomCode) return null;
 
   const { data, error } = await client
@@ -194,6 +194,7 @@ export async function saveRoomGameRound(client, { roomId, roomCode, roundNumber,
       result_data: {
         players,
         scores,
+        savedBy: savedBy || null,
       },
       bet_amount: Number(betRule?.baseAmount || 0),
       bet_rule: betRule || null,

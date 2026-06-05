@@ -93,6 +93,55 @@ function FinalSettlementModal({ settlement, onClose }) {
 }
 
 
+function RoomNoticeModal({ notice, onClose }) {
+  if (!notice) return null;
+
+  const titleId = "roomNoticeTitle";
+  const icon = notice.icon || "🎳";
+  const title = notice.title || "알림";
+  const message = notice.message || "";
+  const detail = notice.detail || "";
+
+  return (
+    <div className="modalBackdrop roomNoticeBackdrop" role="presentation" onClick={onClose}>
+      <section
+        className={`roomNoticeModal ${notice.variant || "info"}`}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby={titleId}
+        onClick={(event) => event.stopPropagation()}
+      >
+        <div className="roomNoticeIcon">{icon}</div>
+        <div className="roomNoticeHeader">
+          {notice.badge && <span>{notice.badge}</span>}
+          <h2 id={titleId}>{title}</h2>
+          {message && <p>{message}</p>}
+        </div>
+        {detail && <div className="roomNoticeDetail">{detail}</div>}
+        <button type="button" className="roomNoticeConfirm" onClick={onClose}>
+          확인했어요
+        </button>
+      </section>
+    </div>
+  );
+}
+
+function RoundStartedToast({ notice, onClose }) {
+  if (!notice) return null;
+
+  return (
+    <div className="roundStartedToast" role="status" aria-live="polite">
+      <div className="roundStartedToastIcon">🎳</div>
+      <div>
+        <strong>{notice.title || "다음 판이 시작됐어요"}</strong>
+        <p>{notice.message || "점수판을 새 판으로 비워두었습니다."}</p>
+      </div>
+      <button type="button" onClick={onClose} aria-label="알림 닫기">×</button>
+    </div>
+  );
+}
+
+
 function MissingPlayersModal({ players, onClose }) {
   const missingPlayers = Array.isArray(players) ? players : [];
   if (missingPlayers.length === 0) return null;
@@ -221,6 +270,9 @@ export default function App() {
   const [roomBetRule, setRoomBetRule] = useState(null);
   const [finalSettlement, setFinalSettlement] = useState(null);
   const [missingPlayersNotice, setMissingPlayersNotice] = useState([]);
+  const [roomNotice, setRoomNotice] = useState(null);
+  const [roundStartedNotice, setRoundStartedNotice] = useState(null);
+  const roundStartedNoticeTimerRef = useRef(null);
   const roomChannelRef = useRef(null);
   const liveRoomReadyRef = useRef(false);
 
@@ -447,7 +499,9 @@ export default function App() {
 
 
 
-const resetLocalRoomScoreForNextRound = () => {
+const resetLocalRoomScoreForNextRound = ({ savedBy, roundNumber } = {}) => {
+  const startedByOtherPlayer = savedBy && user?.id && savedBy !== user.id;
+
   setRolls([]);
   setPinFrames([]);
   setRoomScores([]);
@@ -456,7 +510,22 @@ const resetLocalRoomScoreForNextRound = () => {
     localStorage.removeItem(getLiveRoomDraftKey(roomId, user.id));
   }
 
-  setLiveSyncStatus("현재 판이 저장되어 다음 판으로 넘어갔습니다.");
+  setLiveSyncStatus("현재 판이 저장되어 다음 판으로 넘어갔습니다." );
+
+  if (startedByOtherPlayer) {
+    if (roundStartedNoticeTimerRef.current) {
+      window.clearTimeout(roundStartedNoticeTimerRef.current);
+    }
+
+    setRoundStartedNotice({
+      title: `${Number(roundNumber || 0) + 1}판이 시작됐어요`,
+      message: "다른 플레이어가 현재 판을 저장해서 점수판을 새 판으로 준비했습니다.",
+    });
+
+    roundStartedNoticeTimerRef.current = window.setTimeout(() => {
+      setRoundStartedNotice(null);
+    }, 4500);
+  }
 };
 
   useEffect(() => {
@@ -551,9 +620,12 @@ const resetLocalRoomScoreForNextRound = () => {
             table: "bowling_room_results",
             filter: `room_id=eq.${roomId}`,
           },
-          async () => {
+          async (payload) => {
             await fetchRoomData();
-            resetLocalRoomScoreForNextRound();
+            resetLocalRoomScoreForNextRound({
+              savedBy: payload?.new?.result_data?.savedBy,
+              roundNumber: payload?.new?.round_number,
+            });
           }
         )
         .subscribe();
@@ -769,6 +841,7 @@ const handleFinishCurrentRound = async () => {
       scores: activeScores,
       betRule: activeBetRule,
       settlement,
+      savedBy: user?.id,
     });
 
     try {
@@ -791,7 +864,14 @@ const handleFinishCurrentRound = async () => {
     setRoomScores([]);
     await refreshRoomRounds(roomId);
 
-    alert(`${nextRoundNumber}판이 저장되었습니다. 다음 판을 시작하세요.`);
+    setRoomNotice({
+      variant: "success",
+      icon: "✅",
+      badge: "저장 완료",
+      title: `${nextRoundNumber}판 저장이 끝났어요`,
+      message: "모든 플레이어의 점수를 기록했고 다음 판을 시작할 준비가 되었습니다.",
+      detail: "다른 플레이어 화면도 새 판으로 자동 전환됩니다.",
+    });
   } catch (error) {
     console.error("Round finish failed:", error);
     alert("현재 판 저장 중 오류가 발생했습니다.");
@@ -1500,7 +1580,14 @@ const handleFinalSettlement = async () => {
         return;
       }
 
-      alert("모든 플레이어 기록이 완료되었습니다. 아래 '현재 판 저장하고 다음 판 시작' 버튼을 눌러 판을 저장해주세요.");
+      setRoomNotice({
+        variant: "ready",
+        icon: "🎉",
+        badge: "전원 완료",
+        title: "모든 플레이어 기록이 완료됐어요",
+        message: "이제 실시간 점수판의 ‘전원 완료 후 현재 판 저장’ 버튼을 눌러 현재 판을 확정할 수 있습니다.",
+        detail: "저장 후에는 모든 참가자 화면이 다음 판으로 자동 이동합니다.",
+      });
       return;
     }
 
@@ -1722,6 +1809,20 @@ const handleFinalSettlement = async () => {
           <MissingPlayersModal
             players={missingPlayersNotice}
             onClose={() => setMissingPlayersNotice([])}
+          />
+        )}
+
+        {roomNotice && (
+          <RoomNoticeModal
+            notice={roomNotice}
+            onClose={() => setRoomNotice(null)}
+          />
+        )}
+
+        {roundStartedNotice && (
+          <RoundStartedToast
+            notice={roundStartedNotice}
+            onClose={() => setRoundStartedNotice(null)}
           />
         )}
 
