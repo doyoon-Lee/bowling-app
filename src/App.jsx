@@ -302,6 +302,19 @@ export default function App() {
   const next = getFrameRollLimit(rolls);
 
 
+
+const resetLocalRoomScoreForNextRound = () => {
+  setRolls([]);
+  setPinFrames([]);
+  setRoomScores([]);
+
+  if (roomId && user?.id) {
+    localStorage.removeItem(getLiveRoomDraftKey(roomId, user.id));
+  }
+
+  setLiveSyncStatus("현재 판이 저장되어 다음 판으로 넘어갔습니다.");
+};
+
   useEffect(() => {
     liveRoomReadyRef.current = false;
 
@@ -333,9 +346,17 @@ export default function App() {
           .eq("room_id", roomId)
           .order("updated_at", { ascending: false });
 
+        const { data: rounds } = await client
+          .from("bowling_room_results")
+          .select("*")
+          .eq("room_id", roomId)
+          .order("round_number", { ascending: true })
+          .order("created_at", { ascending: true });
+
         if (!mounted) return;
         setRoomPlayers(players || []);
         setRoomScores(scores || []);
+        setRoomRounds(rounds || []);
       };
 
       await fetchRoomData();
@@ -364,6 +385,19 @@ export default function App() {
           },
           fetchRoomData
         )
+        .on(
+          "postgres_changes",
+          {
+            event: "INSERT",
+            schema: "public",
+            table: "bowling_room_results",
+            filter: `room_id=eq.${roomId}`,
+          },
+          async () => {
+            await fetchRoomData();
+            resetLocalRoomScoreForNextRound();
+          }
+        )
         .subscribe();
 
       roomChannelRef.current = channel;
@@ -377,7 +411,7 @@ export default function App() {
       if (channel && cached) cached.removeChannel(channel);
       if (typeof pollingTimer !== "undefined") window.clearInterval(pollingTimer);
     };
-  }, [roomId]);
+  }, [roomId, user?.id]);
 
   useEffect(() => {
     if (appMode !== "room" || !roomId || !user?.id) return;
