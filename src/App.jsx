@@ -24,7 +24,7 @@ import Scoreboard from "./components/Scoreboard";
 
 import { APP_LOGGED_OUT_KEY, createGuestName, getDisplayUserName, getUserEmail, isEmailLikeDisplayName, isGuestUser, isInAppBrowser, openCurrentPageInExternalBrowser } from "./utils/auth";
 import { createRoom, findRoomByCode, findRoomById, joinRoomById, upsertRoomScore, saveRoomGameRound, fetchRoomGameRounds, clearRoomScores } from "./utils/room";
-import { createBetRule, calculateBetSettlement, summarizeBetSettlement } from "./utils/betting";
+import { createBetRule, calculateBetSettlement, summarizeBetSettlement, ensureBetRule } from "./utils/betting";
 import { groupRecordsByDate } from "./utils/date";
 import { getCachedSupabaseClient, getSupabaseClient } from "./utils/supabaseClient";
 
@@ -175,8 +175,9 @@ export default function App() {
 
         setRoomId(room.id);
         setRoomCode(room.room_code || cachedRoom.roomCode || "");
-        setRoomBetAmount(Number(room.bet_amount || cachedRoom.betAmount || 0));
-        setRoomBetRule(room.bet_rule || cachedRoom.betRule || createBetRule({ mode: "none" }));
+        const restoredBetAmount = Number(room.bet_amount || cachedRoom.betAmount || 0);
+        setRoomBetAmount(restoredBetAmount);
+        setRoomBetRule(ensureBetRule(room.bet_rule || cachedRoom.betRule, restoredBetAmount));
         setRoomBetAmount(Number(room.bet_amount || cachedRoom.betAmount || 0));
         setAppMode("room");
       } catch (error) {
@@ -346,6 +347,12 @@ const resetLocalRoomScoreForNextRound = () => {
           .eq("room_id", roomId)
           .order("updated_at", { ascending: false });
 
+        const { data: room } = await client
+          .from("bowling_rooms")
+          .select("id, room_code, bet_amount, bet_rule, current_round")
+          .eq("id", roomId)
+          .maybeSingle();
+
         const { data: rounds } = await client
           .from("bowling_room_results")
           .select("*")
@@ -357,6 +364,12 @@ const resetLocalRoomScoreForNextRound = () => {
         setRoomPlayers(players || []);
         setRoomScores(scores || []);
         setRoomRounds(rounds || []);
+
+        if (room) {
+          const nextBetAmount = Number(room.bet_amount || 0);
+          setRoomBetAmount(nextBetAmount);
+          setRoomBetRule(ensureBetRule(room.bet_rule, nextBetAmount));
+        }
       };
 
       await fetchRoomData();
@@ -580,7 +593,7 @@ const handleFinishCurrentRound = async () => {
       roundNumber: nextRoundNumber,
       players: roomPlayers,
       scores: roomScores,
-      betRule: roomBetRule,
+      betRule: activeBetRule,
       settlement,
     });
 
@@ -605,7 +618,16 @@ const handleFinalSettlement = async () => {
     return;
   }
 
-  const summary = summarizeBetSettlement(roomRounds.map((round) => round.settlement || []));
+  const summary = summarizeBetSettlement(
+    roomRounds.map((round) => {
+      if (Array.isArray(round.settlement) && round.settlement.length > 0) return round.settlement;
+
+      const roundPlayers = round.result_data?.players || roomPlayers;
+      const roundScores = round.result_data?.scores || [];
+      const roundBetRule = ensureBetRule(round.bet_rule || roomBetRule, Number(round.bet_amount || roomBetAmount || 0));
+      return calculateBetSettlement(roundPlayers, roundScores, roundBetRule);
+    })
+  );
   const message = summary
     .map((item) => `${item.name}: ${item.net >= 0 ? "+" : "-"}${Math.abs(item.net).toLocaleString()}원`)
     .join("\n");
@@ -628,7 +650,7 @@ const handleFinalSettlement = async () => {
 
       localStorage.setItem(
         getLiveRoomCacheKey(user.id),
-        JSON.stringify({ roomId: room.id, roomCode: room.room_code, betAmount: Number(room.bet_amount || betAmount || 0), betRule: room.bet_rule || betRule })
+        JSON.stringify({ roomId: room.id, roomCode: room.room_code, betAmount: Number(room.bet_amount || betAmount || 0), betRule: ensureBetRule(room.bet_rule || betRule, Number(room.bet_amount || betAmount || 0)) })
       );
 
       setRoomPlayers([{ room_id: room.id, user_id: user.id, player_name: roomPlayerName }]);
@@ -637,8 +659,9 @@ const handleFinalSettlement = async () => {
       setRoomId(room.id);
       await refreshRoomRounds(room.id);
       setRoomCode(room.room_code);
-      setRoomBetAmount(Number(room.bet_amount || betAmount || 0));
-      setRoomBetRule(room.bet_rule || betRule || createBetRule({ mode: "none" }));
+      const createdBetAmount = Number(room.bet_amount || betAmount || 0);
+      setRoomBetAmount(createdBetAmount);
+      setRoomBetRule(ensureBetRule(room.bet_rule || betRule, createdBetAmount));
       setAppMode("room");
     } catch (error) {
       alert(`방 만들기 실패: ${error.message}`);
@@ -665,7 +688,7 @@ const handleFinalSettlement = async () => {
 
       localStorage.setItem(
         getLiveRoomCacheKey(user.id),
-        JSON.stringify({ roomId: room.id, roomCode: room.room_code, betAmount: Number(room.bet_amount || 0), betRule: room.bet_rule || createBetRule({ mode: 'none' }) })
+        JSON.stringify({ roomId: room.id, roomCode: room.room_code, betAmount: Number(room.bet_amount || 0), betRule: ensureBetRule(room.bet_rule, Number(room.bet_amount || 0)) })
       );
 
       setRoomPlayers((prev) => {
@@ -674,8 +697,9 @@ const handleFinalSettlement = async () => {
       });
       setRoomId(room.id);
       setRoomCode(room.room_code);
-      setRoomBetAmount(Number(room.bet_amount || 0));
-      setRoomBetRule(room.bet_rule || createBetRule({ mode: "none" }));
+      const joinedBetAmount = Number(room.bet_amount || 0);
+      setRoomBetAmount(joinedBetAmount);
+      setRoomBetRule(ensureBetRule(room.bet_rule, joinedBetAmount));
       setAppMode("room");
     } catch (error) {
       console.warn("Room join failed:", error);

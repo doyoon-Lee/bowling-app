@@ -1,6 +1,6 @@
 import React from "react";
 import { displayTotal, renderFrameMark } from "../utils/bowling.jsx";
-import { BET_RULE_MODES, calculateBetSettlement, getBetRuleTitle, summarizeBetSettlement } from "../utils/betting";
+import { BET_RULE_MODES, calculateBetSettlement, getBetRuleTitle, summarizeBetSettlement, ensureBetRule } from "../utils/betting";
 
 function isPlayerGameComplete(score) {
   const frames = score?.frames || [];
@@ -31,11 +31,7 @@ export default function LiveRoom({
   onFinalSettlement,
 }) {
   const scoresByUser = new Map(roomScores.map((score) => [score.user_id, score]));
-  const activeBetRule = betRule || {
-    mode: Number(betAmount || 0) > 0 ? BET_RULE_MODES.CUSTOM_RANK : BET_RULE_MODES.NONE,
-    baseAmount: Number(betAmount || 0),
-    customRules: [],
-  };
+  const activeBetRule = ensureBetRule(betRule, betAmount);
 
   const hasBet = activeBetRule?.mode && activeBetRule.mode !== BET_RULE_MODES.NONE;
   const hasPlayers = roomPlayers.length > 0;
@@ -44,7 +40,16 @@ export default function LiveRoom({
     roomPlayers.every((player) => isPlayerGameComplete(scoresByUser.get(player.user_id)));
 
   const currentSettlement = calculateBetSettlement(roomPlayers, roomScores, activeBetRule);
-  const cumulativeSettlement = summarizeBetSettlement(roomRounds.map((round) => round.settlement || []));
+  const cumulativeSettlement = summarizeBetSettlement(
+    roomRounds.map((round) => {
+      if (Array.isArray(round.settlement) && round.settlement.length > 0) return round.settlement;
+
+      const roundPlayers = round.result_data?.players || roomPlayers;
+      const roundScores = round.result_data?.scores || [];
+      const roundBetRule = ensureBetRule(round.bet_rule || activeBetRule, Number(round.bet_amount || activeBetRule.baseAmount || 0));
+      return calculateBetSettlement(roundPlayers, roundScores, roundBetRule);
+    })
+  );
 
   const rankedResults = roomPlayers
     .map((player) => {

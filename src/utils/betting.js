@@ -149,3 +149,23 @@ export function summarizeBetSettlement(settlementsByGame = []) {
 
   return Array.from(totals.values()).sort((a, b) => b.net - a.net);
 }
+
+
+export function ensureBetRule(betRule, betAmount = 0) {
+  if (betRule?.mode && betRule.mode !== BET_RULE_MODES.NONE) {
+    return createBetRule({
+      mode: betRule.mode,
+      baseAmount: betRule.baseAmount ?? betAmount,
+      customRules: betRule.customRules || [],
+    });
+  }
+
+  const amount = normalizeMoney(betAmount);
+  if (amount <= 0) return createBetRule({ mode: BET_RULE_MODES.NONE });
+
+  return createBetRule({
+    mode: BET_RULE_MODES.CUSTOM_RANK,
+    baseAmount: amount,
+    customRules: createDefaultCustomRankRules(amount, 6),
+  });
+}
