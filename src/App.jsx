@@ -23,13 +23,19 @@ import ProMode from "./components/ProMode";
 import Scoreboard from "./components/Scoreboard";
 
 import { APP_LOGGED_OUT_KEY, createGuestName, getDisplayUserName, getUserEmail, isEmailLikeDisplayName, isGuestUser, isInAppBrowser, openCurrentPageInExternalBrowser } from "./utils/auth";
-import {createRoom, findRoomByCode, joinRoomById, upsertRoomScore } from "./utils/room";
+import { createRoom, findRoomByCode, findRoomById, joinRoomById, upsertRoomScore } from "./utils/room";
 import { groupRecordsByDate } from "./utils/date";
 import { getCachedSupabaseClient, getSupabaseClient } from "./utils/supabaseClient";
 
 const BOWLING_RECORD_CACHE_PREFIX = "bowling_records_cache_v1";
+const LIVE_ROOM_CACHE_PREFIX = "bowling_live_room_v1";
+
 
 const getRecordCacheKey = (userId) => `${BOWLING_RECORD_CACHE_PREFIX}:${userId || "anonymous"}`;
+const getLiveRoomCacheKey = (userId) => `${LIVE_ROOM_CACHE_PREFIX}:${userId || "anonymous"}`;
+
+const getPlayerNameForRoom = (playerName, user) => playerName?.trim() || getDisplayUserName(user);
+
 
 const mergeRecordsById = (...recordGroups) => {
   const map = new Map();
@@ -99,6 +105,51 @@ export default function App() {
       return currentName;
     });
   }, [user?.id, user?.email]);
+
+  useEffect(() => {
+    if (!user?.id) return;
+
+    let mounted = true;
+
+    async function restoreLiveRoom() {
+      let cachedRoom = null;
+
+      try {
+        cachedRoom = JSON.parse(localStorage.getItem(getLiveRoomCacheKey(user.id)) || "null");
+      } catch (error) {
+        console.warn("Failed to read cached live room:", error);
+      }
+
+      if (!cachedRoom?.roomId) return;
+
+      const client = await getSupabaseClient();
+      if (!client || !mounted) return;
+
+      try {
+        const room = await findRoomById(client, cachedRoom.roomId);
+        if (!room || !mounted) return;
+
+        await joinRoomById(client, {
+          roomId: room.id,
+          userId: user.id,
+          playerName: getPlayerNameForRoom(playerName, user),
+        });
+
+        setRoomId(room.id);
+        setRoomCode(room.room_code || cachedRoom.roomCode || "");
+        setAppMode("room");
+      } catch (error) {
+        console.warn("Cached live room restore failed:", error);
+        localStorage.removeItem(getLiveRoomCacheKey(user.id));
+      }
+    }
+
+    restoreLiveRoom();
+
+    return () => {
+      mounted = false;
+    };
+  }, [user?.id]);
 
   useEffect(() => {
     if (!user?.id) return;
@@ -267,6 +318,8 @@ export default function App() {
           fetchRoomData
         )
         .subscribe();
+
+      roomChannelRef.current = channel;
     }
 
     subscribeRoom();
@@ -340,6 +393,10 @@ export default function App() {
     const client = await getSupabaseClient();
     if (!client) return;
 
+    if (user?.id) {
+      localStorage.removeItem(getLiveRoomCacheKey(user.id));
+    }
+
     if (isGuestUser(user)) {
       localStorage.setItem(APP_LOGGED_OUT_KEY, "true");
       setSession(null);
@@ -361,12 +418,20 @@ export default function App() {
     if (!client || !user) return;
 
     try {
+      const roomPlayerName = getPlayerNameForRoom(playerName, user);
       const room = await createRoom(client, {
         roomName: roomNameInput,
         ownerId: user.id,
-        playerName: playerName || getDisplayUserName(user),
+        playerName: roomPlayerName,
       });
 
+      localStorage.setItem(
+        getLiveRoomCacheKey(user.id),
+        JSON.stringify({ roomId: room.id, roomCode: room.room_code })
+      );
+
+      setRoomPlayers([{ room_id: room.id, user_id: user.id, player_name: roomPlayerName }]);
+      setRoomScores([]);
       setRoomId(room.id);
       setRoomCode(room.room_code);
       setAppMode("room");
@@ -386,12 +451,22 @@ export default function App() {
 
     try {
       const room = await findRoomByCode(client, joinCodeInput);
+      const roomPlayerName = getPlayerNameForRoom(playerName, user);
       await joinRoomById(client, {
         roomId: room.id,
         userId: user.id,
-        playerName: playerName || getDisplayUserName(user),
+        playerName: roomPlayerName,
       });
 
+      localStorage.setItem(
+        getLiveRoomCacheKey(user.id),
+        JSON.stringify({ roomId: room.id, roomCode: room.room_code })
+      );
+
+      setRoomPlayers((prev) => {
+        const others = prev.filter((player) => player.user_id !== user.id);
+        return [...others, { room_id: room.id, user_id: user.id, player_name: roomPlayerName }];
+      });
       setRoomId(room.id);
       setRoomCode(room.room_code);
       setAppMode("room");
@@ -406,6 +481,10 @@ export default function App() {
     if (client && roomChannelRef.current) {
       await client.removeChannel(roomChannelRef.current);
       roomChannelRef.current = null;
+    }
+
+    if (user?.id) {
+      localStorage.removeItem(getLiveRoomCacheKey(user.id));
     }
 
     setAppMode("solo");
@@ -837,7 +916,7 @@ export default function App() {
     const optimisticScore = {
       room_id: roomId,
       user_id: user.id,
-      player_name: playerName.trim() || getDisplayUserName(user),
+      player_name: getPlayerNameForRoom(playerName, user),
       total: nextResult.total,
       rolls: nextRolls,
       frames: nextResult.frames,
@@ -853,6 +932,29 @@ export default function App() {
       onConflict: "room_id,user_id",
     });
   };
+
+  useEffect(() => {
+    if (appMode !== "room" || !roomId || !user) return;
+
+    async function syncRoomPlayerName() {
+      const client = await getSupabaseClient();
+      if (!client) return;
+
+      const roomPlayerName = getPlayerNameForRoom(playerName, user);
+      await joinRoomById(client, {
+        roomId,
+        userId: user.id,
+        playerName: roomPlayerName,
+      });
+
+      setRoomPlayers((prev) => {
+        const others = prev.filter((player) => player.user_id !== user.id);
+        return [...others, { room_id: roomId, user_id: user.id, player_name: roomPlayerName }];
+      });
+    }
+
+    syncRoomPlayerName();
+  }, [playerName, appMode, roomId, user?.id]);
 
   useEffect(() => {
     if (appMode !== "room" || !roomId || !user) return;
