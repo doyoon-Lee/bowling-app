@@ -27,78 +27,27 @@ import {createRoom, findRoomByCode, joinRoomById, upsertRoomScore } from "./util
 import { groupRecordsByDate } from "./utils/date";
 import { getCachedSupabaseClient, getSupabaseClient } from "./utils/supabaseClient";
 
-const BOWLING_RECORDS_CACHE_KEY = "bowling_score_records_cache_v1";
+const BOWLING_RECORD_CACHE_PREFIX = "bowling_records_cache_v1";
 
-function safeParseJson(value, fallback) {
-  try {
-    return value ? JSON.parse(value) : fallback;
-  } catch {
-    return fallback;
-  }
-}
+const getRecordCacheKey = (userId) => `${BOWLING_RECORD_CACHE_PREFIX}:${userId || "anonymous"}`;
 
-function normalizeRecordList(records) {
-  if (!Array.isArray(records)) return [];
+const mergeRecordsById = (...recordGroups) => {
+  const map = new Map();
 
-  const uniqueRecords = new Map();
+  recordGroups
+    .flat()
+    .filter(Boolean)
+    .forEach((record) => {
+      if (!record?.id) return;
+      map.set(record.id, record);
+    });
 
-  records.forEach((record) => {
-    if (!record) return;
-
-    const recordId = record.id || `local-${record.created_at || Date.now()}-${record.total || 0}`;
-    uniqueRecords.set(recordId, { ...record, id: recordId });
+  return Array.from(map.values()).sort((a, b) => {
+    const aTime = new Date(a.created_at || 0).getTime();
+    const bTime = new Date(b.created_at || 0).getTime();
+    return bTime - aTime;
   });
-
-  return Array.from(uniqueRecords.values()).sort((a, b) => {
-    const nextTime = new Date(b.created_at || 0).getTime();
-    const prevTime = new Date(a.created_at || 0).getTime();
-    return nextTime - prevTime;
-  });
-}
-
-function readRecordsCache() {
-  if (typeof window === "undefined") return { byUserId: {}, byUserEmail: {} };
-
-  return safeParseJson(localStorage.getItem(BOWLING_RECORDS_CACHE_KEY), {
-    byUserId: {},
-    byUserEmail: {},
-  });
-}
-
-function writeRecordsCache(cache) {
-  if (typeof window === "undefined") return;
-  localStorage.setItem(BOWLING_RECORDS_CACHE_KEY, JSON.stringify(cache));
-}
-
-function getCachedRecordsForUser(user) {
-  if (!user) return [];
-
-  const cache = readRecordsCache();
-  const email = user.email || user.user_metadata?.email || user.user_metadata?.kakao_account?.email || "";
-
-  return normalizeRecordList([
-    ...(cache.byUserId?.[user.id] || []),
-    ...(email ? cache.byUserEmail?.[email] || [] : []),
-  ]);
-}
-
-function cacheRecordsForUser(user, records) {
-  if (!user) return;
-
-  const cache = readRecordsCache();
-  const normalizedRecords = normalizeRecordList(records);
-  const email = user.email || user.user_metadata?.email || user.user_metadata?.kakao_account?.email || "";
-
-  cache.byUserId = cache.byUserId || {};
-  cache.byUserEmail = cache.byUserEmail || {};
-  cache.byUserId[user.id] = normalizedRecords;
-
-  if (email) {
-    cache.byUserEmail[email] = normalizedRecords;
-  }
-
-  writeRecordsCache(cache);
-}
+};
 
 export default function App() {
   const [session, setSession] = useState(null);
@@ -137,8 +86,68 @@ export default function App() {
   const [isSaving, setIsSaving] = useState(false);
 
   const scoreboardRef = useRef(null);
-  const recordsCacheUserRef = useRef(null);
   const user = session?.user;
+
+  useEffect(() => {
+    if (!user) return;
+
+    setPlayerName((currentName) => {
+      if (currentName.trim()) return currentName;
+      return getDisplayUserName(user);
+    });
+  }, [user?.id]);
+
+  useEffect(() => {
+    if (!user?.id) return;
+
+    let mounted = true;
+    const cacheKey = getRecordCacheKey(user.id);
+
+    try {
+      const cachedRecords = JSON.parse(localStorage.getItem(cacheKey) || "[]");
+      if (Array.isArray(cachedRecords) && cachedRecords.length > 0) {
+        setRecords((prev) => mergeRecordsById(prev, cachedRecords));
+      }
+    } catch (error) {
+      console.warn("Failed to load cached bowling records:", error);
+    }
+
+    async function loadRecords() {
+      const client = await getSupabaseClient();
+      if (!client) return;
+
+      const { data, error } = await client
+        .from("bowling_games")
+        .select("id, user_id, user_email, player_name, place, total, rolls, frames, created_at")
+        .eq("user_id", user.id)
+        .order("created_at", { ascending: false });
+
+      if (!mounted) return;
+
+      if (error) {
+        console.error("Record load error:", error);
+        return;
+      }
+
+      setRecords((prev) => mergeRecordsById(data || [], prev));
+    }
+
+    loadRecords();
+
+    return () => {
+      mounted = false;
+    };
+  }, [user?.id]);
+
+  useEffect(() => {
+    if (!user?.id) return;
+
+    try {
+      localStorage.setItem(getRecordCacheKey(user.id), JSON.stringify(records));
+    } catch (error) {
+      console.warn("Failed to cache bowling records:", error);
+    }
+  }, [records, user?.id]);
 
 
   useEffect(() => {
@@ -190,64 +199,6 @@ export default function App() {
     };
   }, []);
 
-
-  useEffect(() => {
-    if (!user) return;
-
-    setPlayerName((currentName) => {
-      if (currentName.trim()) return currentName;
-      return getDisplayUserName(user);
-    });
-  }, [user?.id]);
-
-  useEffect(() => {
-    if (!user) {
-      recordsCacheUserRef.current = null;
-      return;
-    }
-
-    recordsCacheUserRef.current = user.id;
-    setRecords(getCachedRecordsForUser(user));
-
-    let mounted = true;
-
-    async function loadRecords() {
-      const client = await getSupabaseClient();
-      if (!client) return;
-
-      const { data, error } = await client
-        .from("bowling_games")
-        .select("id, user_id, user_email, player_name, place, total, rolls, frames, created_at")
-        .eq("user_id", user.id)
-        .order("created_at", { ascending: false });
-
-      if (!mounted) return;
-
-      if (error) {
-        console.error("Load records error:", error);
-        return;
-      }
-
-      const mergedRecords = normalizeRecordList([
-        ...(data || []),
-        ...getCachedRecordsForUser(user),
-      ]);
-
-      setRecords(mergedRecords);
-      cacheRecordsForUser(user, mergedRecords);
-    }
-
-    loadRecords();
-
-    return () => {
-      mounted = false;
-    };
-  }, [user?.id]);
-
-  useEffect(() => {
-    if (!user || recordsCacheUserRef.current !== user.id) return;
-    cacheRecordsForUser(user, records);
-  }, [records, user?.id]);
 
   const result = useMemo(() => calcBowlingScore(rolls), [rolls]);
   const maxPossible = useMemo(() => calcMaxPossibleScore(rolls), [rolls]);
@@ -699,26 +650,6 @@ export default function App() {
         for (let first = 0; first <= 9; first++) {
           for (let second = 0; second <= 9 - first; second++) add([first, second]);
         }
-      } else {
-        add(clean.slice(0, 3));
-        add([10, 10, 10]);
-        add([10, 10, 0]);
-        add([10, 0, 10]);
-
-        for (let second = 0; second <= 10; second++) {
-          if (second === 10) {
-            for (let third = 0; third <= 10; third++) add([10, 10, third]);
-          } else {
-            for (let third = 0; third <= 10 - second; third++) add([10, second, third]);
-          }
-        }
-
-        for (let first = 0; first <= 9; first++) {
-          const spareSecond = 10 - first;
-          for (let third = 0; third <= 10; third++) add([first, spareSecond, third]);
-
-          for (let second = 0; second < spareSecond; second++) add([first, second]);
-        }
       }
 
       return candidates;
@@ -743,7 +674,7 @@ export default function App() {
     let groups = originalGroups;
     let best = evaluate(groups);
 
-    for (let frameIndex = 0; frameIndex < Math.min(10, groups.length); frameIndex++) {
+    for (let frameIndex = 0; frameIndex < Math.min(9, groups.length); frameIndex++) {
       const frameNo = frameIndex + 1;
       const candidates = getCandidates(frameNo, groups[frameIndex]);
 
@@ -754,30 +685,6 @@ export default function App() {
         if (result.penalty < best.penalty) {
           best = result;
           groups = nextGroups;
-        }
-      }
-    }
-
-
-    // 9~10프레임은 화면 우측 끝에서 붙어 보여 OCR 경계 오류가 가장 많이 발생한다.
-    // 두 프레임 후보를 동시에 평가해서 누적 점수와 맞는 조합을 우선 적용한다.
-    if (groups.length >= 10 && targetScores.length >= 10) {
-      const ninthCandidates = getCandidates(9, groups[8]);
-      const tenthCandidates = getCandidates(10, groups[9]);
-
-      for (const ninthCandidate of ninthCandidates) {
-        for (const tenthCandidate of tenthCandidates) {
-          const nextGroups = groups.map((group, index) => {
-            if (index === 8) return ninthCandidate;
-            if (index === 9) return tenthCandidate;
-            return group;
-          });
-          const result = evaluate(nextGroups);
-
-          if (result.penalty < best.penalty) {
-            best = result;
-            groups = nextGroups;
-          }
         }
       }
     }
