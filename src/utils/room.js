@@ -83,3 +83,52 @@ export async function upsertRoomScore(client, { roomId, userId, playerName, roll
 
   if (error) throw error;
 }
+
+export async function saveRoomGameRound(client, { roomId, roomCode, roundNumber, players, scores, betRule, settlement }) {
+  if (!roomId || !roomCode) return null;
+
+  const { data, error } = await client
+    .from("bowling_room_results")
+    .insert({
+      room_id: roomId,
+      room_code: roomCode,
+      round_number: roundNumber,
+      result_data: {
+        players,
+        scores,
+      },
+      bet_amount: Number(betRule?.baseAmount || 0),
+      bet_rule: betRule || null,
+      settlement: settlement || [],
+    })
+    .select("*")
+    .single();
+
+  if (error) throw error;
+  return data;
+}
+
+export async function fetchRoomGameRounds(client, roomId) {
+  if (!roomId) return [];
+
+  const { data, error } = await client
+    .from("bowling_room_results")
+    .select("*")
+    .eq("room_id", roomId)
+    .order("round_number", { ascending: true })
+    .order("created_at", { ascending: true });
+
+  if (error) throw error;
+  return data || [];
+}
+
+export async function clearRoomScores(client, roomId) {
+  if (!roomId) return;
+
+  const { error } = await client
+    .from("bowling_room_scores")
+    .delete()
+    .eq("room_id", roomId);
+
+  if (error) throw error;
+}

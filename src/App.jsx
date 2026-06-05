@@ -23,8 +23,8 @@ import ProMode from "./components/ProMode";
 import Scoreboard from "./components/Scoreboard";
 
 import { APP_LOGGED_OUT_KEY, createGuestName, getDisplayUserName, getUserEmail, isEmailLikeDisplayName, isGuestUser, isInAppBrowser, openCurrentPageInExternalBrowser } from "./utils/auth";
-import { createRoom, findRoomByCode, findRoomById, joinRoomById, upsertRoomScore } from "./utils/room";
-import { createBetRule } from "./utils/betting";
+import { createRoom, findRoomByCode, findRoomById, joinRoomById, upsertRoomScore, saveRoomGameRound, fetchRoomGameRounds, clearRoomScores } from "./utils/room";
+import { createBetRule, calculateBetSettlement, summarizeBetSettlement } from "./utils/betting";
 import { groupRecordsByDate } from "./utils/date";
 import { getCachedSupabaseClient, getSupabaseClient } from "./utils/supabaseClient";
 
@@ -97,6 +97,7 @@ export default function App() {
   const [roomCode, setRoomCode] = useState("");
   const [roomPlayers, setRoomPlayers] = useState([]);
   const [roomScores, setRoomScores] = useState([]);
+  const [roomRounds, setRoomRounds] = useState([]);
   const [roomBetAmount, setRoomBetAmount] = useState(0);
   const [roomBetRule, setRoomBetRule] = useState(null);
   const roomChannelRef = useRef(null);
@@ -307,6 +308,7 @@ export default function App() {
     if (!roomId) {
       setRoomPlayers([]);
       setRoomScores([]);
+    setRoomRounds([]);
       return;
     }
 
@@ -502,6 +504,76 @@ export default function App() {
     setPlayerName("");
   };
 
+
+const refreshRoomRounds = async (targetRoomId = roomId) => {
+  const client = await getSupabaseClient();
+  if (!client || !targetRoomId) return;
+
+  try {
+    const rounds = await fetchRoomGameRounds(client, targetRoomId);
+    setRoomRounds(rounds);
+  } catch (error) {
+    console.warn("Room rounds load failed:", error);
+  }
+};
+
+const handleFinishCurrentRound = async () => {
+  const client = await getSupabaseClient();
+  if (!client || !roomId || !roomCode || roomPlayers.length === 0) return;
+
+  const scoresByUser = new Map(roomScores.map((score) => [score.user_id, score]));
+  const allFinished = roomPlayers.every((player) => {
+    const score = scoresByUser.get(player.user_id);
+    return (score?.frames || []).length >= 10 && typeof score?.total === "number";
+  });
+
+  if (!allFinished) {
+    alert("모든 플레이어가 10프레임까지 입력해야 현재 판을 종료할 수 있습니다.");
+    return;
+  }
+
+  try {
+    const nextRoundNumber = roomRounds.length + 1;
+    const settlement = calculateBetSettlement(roomPlayers, roomScores, roomBetRule);
+    await saveRoomGameRound(client, {
+      roomId,
+      roomCode,
+      roundNumber: nextRoundNumber,
+      players: roomPlayers,
+      scores: roomScores,
+      betRule: roomBetRule,
+      settlement,
+    });
+
+    await clearRoomScores(client, roomId);
+    if (user?.id) localStorage.removeItem(getLiveRoomDraftKey(roomId, user.id));
+
+    setRolls([]);
+    setPinFrames([]);
+    setRoomScores([]);
+    await refreshRoomRounds(roomId);
+
+    alert(`${nextRoundNumber}판이 저장되었습니다. 다음 판을 시작하세요.`);
+  } catch (error) {
+    console.error("Round finish failed:", error);
+    alert("현재 판 저장 중 오류가 발생했습니다.");
+  }
+};
+
+const handleFinalSettlement = async () => {
+  if (!roomRounds.length) {
+    alert("정산할 완료된 판이 없습니다.");
+    return;
+  }
+
+  const summary = summarizeBetSettlement(roomRounds.map((round) => round.settlement || []));
+  const message = summary
+    .map((item) => `${item.name}: ${item.net >= 0 ? "+" : "-"}${Math.abs(item.net).toLocaleString()}원`)
+    .join("\n");
+
+  alert(`누적 정산 결과\n\n${message}`);
+};
+
   const handleCreateRoom = async ({ betAmount = 0, betRule = null } = {}) => {
     const client = await getSupabaseClient();
     if (!client || !user) return;
@@ -522,7 +594,9 @@ export default function App() {
 
       setRoomPlayers([{ room_id: room.id, user_id: user.id, player_name: roomPlayerName }]);
       setRoomScores([]);
+      setRoomRounds([]);
       setRoomId(room.id);
+      await refreshRoomRounds(room.id);
       setRoomCode(room.room_code);
       setRoomBetAmount(Number(room.bet_amount || betAmount || 0));
       setRoomBetRule(room.bet_rule || betRule || createBetRule({ mode: "none" }));
@@ -1322,6 +1396,9 @@ export default function App() {
             currentUserId={user.id}
             betAmount={roomBetAmount}
             betRule={roomBetRule}
+            roomRounds={roomRounds}
+            onFinishCurrentRound={handleFinishCurrentRound}
+            onFinalSettlement={handleFinalSettlement}
           />
         )}
 

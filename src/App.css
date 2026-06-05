@@ -2514,3 +2514,125 @@ body {
   font-size: 13px;
   line-height: 1.45;
 }
+
+
+.cumulativeSettlementBox {
+  display: grid;
+  gap: 12px;
+  padding: 16px;
+  border: 1px solid #c7d2fe;
+  border-radius: 18px;
+  background: #f8fafc;
+  margin-bottom: 14px;
+}
+
+.cumulativeSettlementHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 12px;
+}
+
+.cumulativeSettlementHeader strong {
+  color: #0f172a;
+  font-size: 18px;
+}
+
+.cumulativeSettlementHeader p,
+.settlementMuted {
+  margin: 4px 0 0;
+  color: #64748b;
+  font-size: 13px;
+  line-height: 1.45;
+}
+
+.cumulativeSettlementHeader span {
+  flex: 0 0 auto;
+  color: #2563eb;
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.cumulativeSettlementList {
+  display: grid;
+  gap: 8px;
+}
+
+.cumulativeSettlementItem {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  padding: 11px 12px;
+  border-radius: 14px;
+  background: white;
+  border: 1px solid #e2e8f0;
+}
+
+.cumulativeSettlementItem strong {
+  color: #0f172a;
+}
+
+.cumulativeSettlementItem em {
+  font-style: normal;
+  font-weight: 900;
+}
+
+.cumulativeSettlementItem em.positive {
+  color: #2563eb;
+}
+
+.cumulativeSettlementItem em.negative {
+  color: #dc2626;
+}
+
+.roundHistoryList {
+  display: grid;
+  gap: 8px;
+}
+
+.roundHistoryItem {
+  display: grid;
+  gap: 3px;
+  padding: 10px 12px;
+  border-radius: 12px;
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+}
+
+.roundHistoryItem strong {
+  color: #0f172a;
+  font-size: 14px;
+}
+
+.roundHistoryItem span {
+  color: #64748b;
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+.roomRoundActions {
+  display: grid;
+  grid-template-columns: 1.4fr 1fr;
+  gap: 8px;
+}
+
+.roomRoundActions button {
+  border: 0;
+  border-radius: 14px;
+  padding: 12px 10px;
+  background: #2563eb;
+  color: white;
+  font-weight: 900;
+}
+
+.roomRoundActions button.secondary {
+  background: #e2e8f0;
+  color: #334155;
+}
+
+@media (max-width: 640px) {
+  .roomRoundActions {
+    grid-template-columns: 1fr;
+  }
+}

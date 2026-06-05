@@ -1,11 +1,10 @@
 import React from "react";
 import { displayTotal, renderFrameMark } from "../utils/bowling.jsx";
-import { BET_RULE_MODES, calculateBetSettlement, getBetRuleTitle } from "../utils/betting";
+import { BET_RULE_MODES, calculateBetSettlement, getBetRuleTitle, summarizeBetSettlement } from "../utils/betting";
 
 function isPlayerGameComplete(score) {
   const frames = score?.frames || [];
   const tenthFrame = frames[9];
-
   return frames.length >= 10 && tenthFrame && typeof score?.total === "number";
 }
 
@@ -16,7 +15,21 @@ function getRankLabel(rank) {
   return `${rank}등`;
 }
 
-export default function LiveRoom({ roomPlayers, roomScores, currentUserId, betAmount = 0, betRule = null }) {
+function formatMoney(value) {
+  const amount = Number(value || 0);
+  return `${amount >= 0 ? "+" : "-"}${Math.abs(amount).toLocaleString()}원`;
+}
+
+export default function LiveRoom({
+  roomPlayers,
+  roomScores,
+  currentUserId,
+  betAmount = 0,
+  betRule = null,
+  roomRounds = [],
+  onFinishCurrentRound,
+  onFinalSettlement,
+}) {
   const scoresByUser = new Map(roomScores.map((score) => [score.user_id, score]));
   const activeBetRule = betRule || {
     mode: Number(betAmount || 0) > 0 ? BET_RULE_MODES.CUSTOM_RANK : BET_RULE_MODES.NONE,
@@ -24,17 +37,19 @@ export default function LiveRoom({ roomPlayers, roomScores, currentUserId, betAm
     customRules: [],
   };
 
-  const settlement = calculateBetSettlement(roomPlayers, roomScores, activeBetRule);
   const hasBet = activeBetRule?.mode && activeBetRule.mode !== BET_RULE_MODES.NONE;
   const hasPlayers = roomPlayers.length > 0;
   const isFinished =
     hasPlayers &&
     roomPlayers.every((player) => isPlayerGameComplete(scoresByUser.get(player.user_id)));
 
+  const currentSettlement = calculateBetSettlement(roomPlayers, roomScores, activeBetRule);
+  const cumulativeSettlement = summarizeBetSettlement(roomRounds.map((round) => round.settlement || []));
+
   const rankedResults = roomPlayers
     .map((player) => {
       const score = scoresByUser.get(player.user_id);
-      const settlementItem = settlement.find((item) => item.userId === player.user_id);
+      const settlementItem = currentSettlement.find((item) => item.userId === player.user_id);
 
       return {
         userId: player.user_id,
@@ -56,17 +71,55 @@ export default function LiveRoom({ roomPlayers, roomScores, currentUserId, betAm
       <div className="liveRoomBoardHeader">
         <div>
           <h2>실시간 점수판</h2>
-          <p>참가자가 핀을 입력할 때마다 자동으로 갱신됩니다.</p>
+          <p>현재 판을 종료하면 결과가 누적되고, 점수판은 다음 판 입력용으로 초기화됩니다.</p>
         </div>
         <span>{roomPlayers.length}명 참여</span>
       </div>
+
+      {roomRounds.length > 0 && (
+        <div className="cumulativeSettlementBox">
+          <div className="cumulativeSettlementHeader">
+            <div>
+              <strong>누적 정산</strong>
+              <p>현재까지 저장된 {roomRounds.length}판 기준입니다.</p>
+            </div>
+            {hasBet && <span>{getBetRuleTitle(activeBetRule)}</span>}
+          </div>
+
+          {hasBet ? (
+            <div className="cumulativeSettlementList">
+              {cumulativeSettlement.map((item) => (
+                <div className="cumulativeSettlementItem" key={item.userId}>
+                  <strong>{item.name}</strong>
+                  <em className={item.net >= 0 ? "positive" : "negative"}>{formatMoney(item.net)}</em>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <p className="settlementMuted">내기 없이 진행 중입니다. 판별 점수 기록만 누적됩니다.</p>
+          )}
+
+          <div className="roundHistoryList">
+            {roomRounds.map((round) => (
+              <div className="roundHistoryItem" key={round.id}>
+                <strong>{round.round_number || "-"}판</strong>
+                <span>
+                  {(round.result_data?.scores || [])
+                    .map((score) => `${score.player_name || "플레이어"} ${score.total || 0}점`)
+                    .join(" · ")}
+                </span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       {isFinished && (
         <div className="gameResultBox">
           <div className="gameResultHeader">
             <div>
-              <strong>게임 종료 결과</strong>
-              <p>10프레임까지 입력된 최종 점수 기준입니다.</p>
+              <strong>현재 판 종료 결과</strong>
+              <p>10프레임까지 입력된 최종 점수 기준입니다. 판 저장 후 다음 판으로 넘어갈 수 있습니다.</p>
             </div>
             <span>최종 순위</span>
           </div>
@@ -83,7 +136,7 @@ export default function LiveRoom({ roomPlayers, roomScores, currentUserId, betAm
                   <strong>{item.total}점</strong>
                   {hasBet && (
                     <em className={item.net >= 0 ? "positive" : "negative"}>
-                      {item.net >= 0 ? "+" : "-"}{Math.abs(item.net).toLocaleString()}원
+                      {formatMoney(item.net)}
                     </em>
                   )}
                 </div>
@@ -91,27 +144,27 @@ export default function LiveRoom({ roomPlayers, roomScores, currentUserId, betAm
             ))}
           </div>
 
-          {hasBet && (
-            <div className="gameResultSettlementNote">
-              <strong>정산 요약</strong>
-              <p>
-                +는 받을 금액, -는 잃고 있는 금액입니다. 실제 송금 전 동점/핸디 여부는 참가자끼리 확인하세요.
-              </p>
-            </div>
-          )}
+          <div className="roomRoundActions">
+            <button type="button" onClick={onFinishCurrentRound}>
+              현재 판 저장하고 다음 판 시작
+            </button>
+            <button type="button" className="secondary" onClick={onFinalSettlement}>
+              게임종료 / 누적 정산
+            </button>
+          </div>
         </div>
       )}
 
       {hasBet && !isFinished && (
         <div className="betSettlementBox">
           <div className="betSettlementHeader">
-            <strong>내기 정산</strong>
+            <strong>현재 판 임시 정산</strong>
             <span>{getBetRuleTitle(activeBetRule)}</span>
           </div>
-          <p>현재 점수 기준 임시 정산입니다. 게임 종료 후 최종 순위로 확정됩니다.</p>
+          <p>현재 점수 기준 임시 정산입니다. 판 종료 후 저장해야 누적 정산에 반영됩니다.</p>
 
           <div className="betSettlementList">
-            {settlement.map((item) => (
+            {currentSettlement.map((item) => (
               <div className="betSettlementItem" key={item.userId}>
                 <div>
                   <strong>{item.rank}등 {item.name}</strong>
@@ -120,7 +173,7 @@ export default function LiveRoom({ roomPlayers, roomScores, currentUserId, betAm
                   </span>
                 </div>
                 <em className={item.net >= 0 ? "positive" : "negative"}>
-                  {item.net >= 0 ? "+" : "-"}{Math.abs(item.net).toLocaleString()}원
+                  {formatMoney(item.net)}
                 </em>
               </div>
             ))}
