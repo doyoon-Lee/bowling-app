@@ -39,6 +39,58 @@ const getLiveRoomDraftKey = (roomId, userId) => `${LIVE_ROOM_DRAFT_PREFIX}:${roo
 
 const getPlayerNameForRoom = (playerName, user) => playerName?.trim() || getDisplayUserName(user);
 
+const formatSettlementMoney = (value) => {
+  const amount = Number(value || 0);
+  return `${amount >= 0 ? "+" : "-"}${Math.abs(amount).toLocaleString()}원`;
+};
+
+function FinalSettlementModal({ settlement, onClose }) {
+  if (!settlement) return null;
+
+  const totalGames = Number(settlement.totalGames || 0);
+  const players = Array.isArray(settlement.players) ? settlement.players : [];
+
+  return (
+    <div className="modalBackdrop settlementModalBackdrop" role="presentation" onClick={onClose}>
+      <section
+        className="settlementModal"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="settlementModalTitle"
+        onClick={(event) => event.stopPropagation()}
+      >
+        <div className="settlementModalHeader">
+          <div>
+            <span>게임 종료</span>
+            <h2 id="settlementModalTitle">누적 정산 결과</h2>
+            <p>{totalGames}판 기준으로 계산된 최종 정산입니다.</p>
+          </div>
+          <button type="button" aria-label="정산 결과 닫기" onClick={onClose}>×</button>
+        </div>
+
+        <div className="settlementModalList">
+          {players.map((item, index) => (
+            <div className={item.net >= 0 ? "settlementModalItem winner" : "settlementModalItem"} key={item.userId || item.name}>
+              <div>
+                <span>{index + 1}</span>
+                <strong>{item.name}</strong>
+              </div>
+              <em className={item.net >= 0 ? "positive" : "negative"}>
+                {formatSettlementMoney(item.net)}
+              </em>
+            </div>
+          ))}
+        </div>
+
+        <div className="settlementModalFooter">
+          <p>정산 금액은 저장된 판 결과 기준입니다.</p>
+          <button type="button" onClick={onClose}>확인</button>
+        </div>
+      </section>
+    </div>
+  );
+}
+
 const saveLiveRoomDraft = ({ roomId, userId, rolls, pinFrames }) => {
   if (!roomId || !userId) return;
 
@@ -100,6 +152,7 @@ export default function App() {
   const [roomRounds, setRoomRounds] = useState([]);
   const [roomBetAmount, setRoomBetAmount] = useState(0);
   const [roomBetRule, setRoomBetRule] = useState(null);
+  const [finalSettlement, setFinalSettlement] = useState(null);
   const roomChannelRef = useRef(null);
   const liveRoomReadyRef = useRef(false);
 
@@ -623,12 +676,12 @@ const handleFinalSettlement = async () => {
       const roundBetRule = ensureBetRule(activeBetRule || round.bet_rule, Number(activeBetRule?.baseAmount || round.bet_amount || 0));
       return calculateBetSettlement(roundPlayers, roundScores, roundBetRule);
     })
-  );
-  const message = summary
-    .map((item) => `${item.name}: ${item.net >= 0 ? "+" : "-"}${Math.abs(item.net).toLocaleString()}원`)
-    .join("\n");
+  ).sort((a, b) => Number(b.net || 0) - Number(a.net || 0));
 
-  alert(`누적 정산 결과\n\n${message}`);
+  setFinalSettlement({
+    totalGames: roomRounds.length,
+    players: summary,
+  });
 };
 
   const handleCreateRoom = async ({ betAmount = 0, betRule = null } = {}) => {
@@ -1499,6 +1552,13 @@ const handleFinalSettlement = async () => {
             placeCandidates={placeCandidates}
             onSelect={selectBowlingPlace}
             onClose={() => setIsPlaceModalOpen(false)}
+          />
+        )}
+
+        {finalSettlement && (
+          <FinalSettlementModal
+            settlement={finalSettlement}
+            onClose={() => setFinalSettlement(null)}
           />
         )}
 
