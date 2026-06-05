@@ -134,3 +134,39 @@ export async function clearRoomScores(client, roomId) {
 
   if (error) throw error;
 }
+
+export async function leaveRoomById(client, { roomId, userId }) {
+  if (!roomId || !userId) return;
+
+  const { error } = await client
+    .from("bowling_room_players")
+    .delete()
+    .eq("room_id", roomId)
+    .eq("user_id", userId);
+
+  if (error) throw error;
+
+  await removeEmptyRoom(client, roomId);
+}
+
+export async function removeEmptyRoom(client, roomId) {
+  if (!roomId) return false;
+
+  const { count, error: countError } = await client
+    .from("bowling_room_players")
+    .select("id", { count: "exact", head: true })
+    .eq("room_id", roomId);
+
+  if (countError) throw countError;
+
+  if ((count || 0) > 0) return false;
+
+  const { error: deleteError } = await client
+    .from("bowling_rooms")
+    .delete()
+    .eq("id", roomId);
+
+  if (deleteError) throw deleteError;
+
+  return true;
+}

@@ -23,7 +23,7 @@ import ProMode from "./components/ProMode";
 import Scoreboard from "./components/Scoreboard";
 
 import { APP_LOGGED_OUT_KEY, createGuestName, getDisplayUserName, getUserEmail, isEmailLikeDisplayName, isGuestUser, isInAppBrowser, openCurrentPageInExternalBrowser } from "./utils/auth";
-import { createRoom, findRoomByCode, findRoomById, joinRoomById, upsertRoomScore, saveRoomGameRound, fetchRoomGameRounds, clearRoomScores } from "./utils/room";
+import { createRoom, findRoomByCode, findRoomById, joinRoomById, upsertRoomScore, saveRoomGameRound, fetchRoomGameRounds, clearRoomScores, leaveRoomById } from "./utils/room";
 import { createBetRule, calculateBetSettlement, summarizeBetSettlement, ensureBetRule } from "./utils/betting";
 import { groupRecordsByDate } from "./utils/date";
 import { getCachedSupabaseClient, getSupabaseClient } from "./utils/supabaseClient";
@@ -707,14 +707,28 @@ const handleFinalSettlement = async () => {
   const handleLeaveRoom = async () => {
     const client = getCachedSupabaseClient();
 
+    const leavingRoomId = roomId;
+    const leavingUserId = user?.id;
+
     if (client && roomChannelRef.current) {
       await client.removeChannel(roomChannelRef.current);
       roomChannelRef.current = null;
     }
 
-    if (user?.id) {
-      localStorage.removeItem(getLiveRoomCacheKey(user.id));
-      if (roomId) localStorage.removeItem(getLiveRoomDraftKey(roomId, user.id));
+    if (client && leavingRoomId && leavingUserId) {
+      try {
+        await leaveRoomById(client, {
+          roomId: leavingRoomId,
+          userId: leavingUserId,
+        });
+      } catch (error) {
+        console.warn("Room leave cleanup failed:", error);
+      }
+    }
+
+    if (leavingUserId) {
+      localStorage.removeItem(getLiveRoomCacheKey(leavingUserId));
+      if (leavingRoomId) localStorage.removeItem(getLiveRoomDraftKey(leavingRoomId, leavingUserId));
     }
 
     setAppMode("solo");
@@ -722,6 +736,7 @@ const handleFinalSettlement = async () => {
     setRoomCode("");
     setRoomPlayers([]);
     setRoomScores([]);
+    setRoomRounds([]);
     setRoomBetAmount(0);
     setRoomBetRule(null);
   };
