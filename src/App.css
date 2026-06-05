@@ -2078,3 +2078,12 @@ body {
   font-size: 12px;
   color: #64748b;
 }
+
+
+.roomCreateBox.singleAction {
+  display: block;
+}
+
+.roomCreateBox.singleAction button {
+  width: 100%;
+}
