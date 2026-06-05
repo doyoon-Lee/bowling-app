@@ -170,8 +170,7 @@ export function ensureBetRule(betRule, betAmount = 0) {
   if (amount <= 0) return createBetRule({ mode: BET_RULE_MODES.NONE });
 
   return createBetRule({
-    mode: BET_RULE_MODES.CUSTOM_RANK,
+    mode: BET_RULE_MODES.EQUAL,
     baseAmount: amount,
-    customRules: createDefaultCustomRankRules(amount, 6),
   });
 }

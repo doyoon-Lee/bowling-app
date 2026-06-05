@@ -617,11 +617,10 @@ const handleFinalSettlement = async () => {
 
   const summary = summarizeBetSettlement(
     roomRounds.map((round) => {
-      if (Array.isArray(round.settlement) && round.settlement.length > 0) return round.settlement;
-
+      const activeBetRule = ensureBetRule(roomBetRule, roomBetAmount);
       const roundPlayers = round.result_data?.players || roomPlayers;
       const roundScores = round.result_data?.scores || [];
-      const roundBetRule = ensureBetRule(round.bet_rule || roomBetRule, Number(round.bet_amount || roomBetAmount || 0));
+      const roundBetRule = ensureBetRule(activeBetRule || round.bet_rule, Number(activeBetRule?.baseAmount || round.bet_amount || 0));
       return calculateBetSettlement(roundPlayers, roundScores, roundBetRule);
     })
   );
