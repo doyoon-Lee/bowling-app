@@ -202,8 +202,13 @@ async function saveLiveRoomGameHistories(client, { roomCode, roundNumber, player
 
   if (historyRows.length === 0) return;
 
-  const { error } = await client.from("bowling_games").insert(historyRows);
+  const { data, error } = await client
+    .from("bowling_games")
+    .insert(historyRows)
+    .select("id, user_id, user_email, player_name, place, total, rolls, frames, created_at");
+
   if (error) throw error;
+  return data || [];
 }
 
 const saveLiveRoomDraft = ({ roomId, userId, rolls, pinFrames, currentRound }) => {
@@ -845,15 +850,27 @@ const handleFinishCurrentRound = async () => {
     });
 
     try {
-      await saveLiveRoomGameHistories(client, {
+      const savedHistoryRows = await saveLiveRoomGameHistories(client, {
         roomCode,
         roundNumber: nextRoundNumber,
         players: activePlayers,
         scores: activeScores,
         place,
       });
+
+      const mySavedHistoryRows = (savedHistoryRows || []).filter((record) => record.user_id === user?.id);
+      if (mySavedHistoryRows.length > 0) {
+        setRecords((prev) => mergeRecordsById(mySavedHistoryRows, prev));
+      }
     } catch (historyError) {
       console.warn("Live room history sync failed:", historyError);
+      setRoomNotice({
+        variant: "warning",
+        icon: "⚠️",
+        badge: "개인 기록 확인 필요",
+        title: "방 결과는 저장됐지만 개인 기록 반영에 실패했어요",
+        message: "현재 판 결과는 내기방에는 저장됐습니다. 개인 날짜별 기록 저장은 네트워크 상태를 확인한 뒤 다시 시도해주세요.",
+      });
     }
 
     await clearRoomScores(client, roomId);
