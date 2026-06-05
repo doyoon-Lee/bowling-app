@@ -22,7 +22,7 @@ import RoomLobby from "./components/RoomLobby";
 import ProMode from "./components/ProMode";
 import Scoreboard from "./components/Scoreboard";
 
-import { APP_LOGGED_OUT_KEY, createGuestName, getDisplayUserName, getUserEmail, isEmailLikeDisplayName, isGuestUser, isInAppBrowser, openCurrentPageInExternalBrowser } from "./utils/auth";
+import { APP_LOGGED_OUT_KEY, createGuestName, getDisplayUserName, isEmailLikeDisplayName, isGuestUser, isInAppBrowser, openCurrentPageInExternalBrowser } from "./utils/auth";
 import {createRoom, findRoomByCode, joinRoomById, upsertRoomScore } from "./utils/room";
 import { groupRecordsByDate } from "./utils/date";
 import { getCachedSupabaseClient, getSupabaseClient } from "./utils/supabaseClient";
@@ -971,7 +971,7 @@ export default function App() {
         <header className="header compactHeader">
           <div>
             <h1>🎳 Bowling Score</h1>
-            <p>{getUserEmail(user)}</p>
+            <p>{getDisplayUserName(user)}</p>
           </div>
           <div className="headerActions">
             <button className="logoutButton" onClick={signOut}>
