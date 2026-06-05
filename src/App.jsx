@@ -569,24 +569,21 @@ const handleFinishCurrentRound = async () => {
   if (!client || !roomId || !roomCode || roomPlayers.length === 0) return;
 
   const scoresByUser = new Map(roomScores.map((score) => [score.user_id, score]));
-  const allFinished = roomPlayers.every((player) => {
+  const incompletePlayers = roomPlayers.filter((player) => {
     const score = scoresByUser.get(player.user_id);
-    return (score?.frames || []).length >= 10 && typeof score?.total === "number";
+    return !score || (score.frames || []).length < 10 || typeof score.total !== "number";
   });
 
-  if (!allFinished) {
-    const incompletePlayers = roomPlayers.filter((player) => {
-      const score = scoresByUser.get(player.user_id);
-      return !score || (score.frames || []).length < 10 || typeof score.total !== "number";
-    });
-
+  if (incompletePlayers.length > 0) {
     alert(`아직 기록이 필요한 플레이어가 있습니다.\n${incompletePlayers.map((player) => `- ${player.player_name}`).join("\n")}`);
     return;
   }
 
   try {
     const nextRoundNumber = roomRounds.length + 1;
-    const settlement = calculateBetSettlement(roomPlayers, roomScores, roomBetRule);
+    const activeBetRule = ensureBetRule(roomBetRule, roomBetAmount);
+    const settlement = calculateBetSettlement(roomPlayers, roomScores, activeBetRule);
+
     await saveRoomGameRound(client, {
       roomId,
       roomCode,

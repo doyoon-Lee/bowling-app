@@ -101,8 +101,12 @@ export function calculateBetSettlement(roomPlayers, roomScores, betRule) {
     }
 
     if (rank > 1 && betRule.mode === BET_RULE_MODES.CUSTOM_RANK) {
-      const customRule = betRule.customRules?.find((rule) => Number(rule.rank) === rank);
-      pay = normalizeMoney(customRule?.pay ?? (rank - 1) * Number(betRule.baseAmount || 0));
+      if (ranked.length === 2 && rank === 2) {
+        pay = normalizeMoney(betRule.baseAmount);
+      } else {
+        const customRule = betRule.customRules?.find((rule) => Number(rule.rank) === rank);
+        pay = normalizeMoney(customRule?.pay ?? (rank - 1) * Number(betRule.baseAmount || 0));
+      }
     }
 
     return {
