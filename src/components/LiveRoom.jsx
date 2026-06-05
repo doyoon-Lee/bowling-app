@@ -1,6 +1,49 @@
-import React from "react";
-import { displayTotal, renderFrameMark } from "../utils/bowling.jsx";
+import React, { useEffect, useRef } from "react";
+import { displayTotal, getFrameRollLimit, renderFrameMark } from "../utils/bowling.jsx";
 import { BET_RULE_MODES, calculateBetSettlement, getBetRuleTitle, summarizeBetSettlement, ensureBetRule } from "../utils/betting";
+
+
+function MiniFrameScoreboard({ frames, rolls = [] }) {
+  const miniFramesRef = useRef(null);
+  const next = getFrameRollLimit(Array.isArray(rolls) ? rolls : []);
+
+  useEffect(() => {
+    const board = miniFramesRef.current;
+    if (!board) return;
+
+    const activeFrameIndex = next?.frame ? next.frame - 1 : 9;
+    const activeFrame = board.children?.[activeFrameIndex];
+    if (!activeFrame) return;
+
+    const boardLeft = board.scrollLeft;
+    const boardRight = boardLeft + board.clientWidth;
+    const frameLeft = activeFrame.offsetLeft;
+    const frameRight = frameLeft + activeFrame.offsetWidth;
+    const padding = 8;
+
+    if (frameLeft < boardLeft + padding || frameRight > boardRight - padding) {
+      board.scrollTo({
+        left: Math.max(frameLeft - padding, 0),
+        behavior: "smooth",
+      });
+    }
+  }, [next?.frame, rolls.length]);
+
+  return (
+    <div className="miniFrames" ref={miniFramesRef}>
+      {Array.from({ length: 10 }, (_, index) => {
+        const frame = frames[index];
+        return (
+          <div className="miniFrame" key={index}>
+            <span>{index + 1}</span>
+            <strong>{renderFrameMark(frame?.mark)}</strong>
+            <em>{displayTotal(frame?.total)}</em>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
 
 function isPlayerGameComplete(score) {
   const frames = score?.frames || [];
@@ -196,18 +239,7 @@ export default function LiveRoom({
 
                 <div className="roomPlayerTotal">{total}</div>
 
-                <div className="miniFrames">
-                  {Array.from({ length: 10 }, (_, index) => {
-                    const frame = frames[index];
-                    return (
-                      <div className="miniFrame" key={index}>
-                        <span>{index + 1}</span>
-                        <strong>{renderFrameMark(frame?.mark)}</strong>
-                        <em>{displayTotal(frame?.total)}</em>
-                      </div>
-                    );
-                  })}
-                </div>
+                <MiniFrameScoreboard frames={frames} rolls={score?.rolls || []} />
               </div>
             );
           })}

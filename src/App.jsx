@@ -355,6 +355,28 @@ export default function App() {
   const sortedDateKeys = useMemo(() => Object.keys(groupedRecords).sort((a, b) => b.localeCompare(a)), [groupedRecords]);
   const next = getFrameRollLimit(rolls);
 
+  useEffect(() => {
+    const board = scoreboardRef.current;
+    if (!board) return;
+
+    const activeFrameIndex = next?.frame ? next.frame - 1 : 9;
+    const activeFrame = board.children?.[activeFrameIndex];
+    if (!activeFrame) return;
+
+    const boardLeft = board.scrollLeft;
+    const boardRight = boardLeft + board.clientWidth;
+    const frameLeft = activeFrame.offsetLeft;
+    const frameRight = frameLeft + activeFrame.offsetWidth;
+    const padding = 12;
+
+    if (frameLeft < boardLeft + padding || frameRight > boardRight - padding) {
+      board.scrollTo({
+        left: Math.max(frameLeft - padding, 0),
+        behavior: "smooth",
+      });
+    }
+  }, [next?.frame, rolls.length]);
+
 
 
 const resetLocalRoomScoreForNextRound = () => {
