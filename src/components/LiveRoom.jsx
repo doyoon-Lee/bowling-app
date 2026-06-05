@@ -39,7 +39,25 @@ export default function LiveRoom({
     hasPlayers &&
     roomPlayers.every((player) => isPlayerGameComplete(scoresByUser.get(player.user_id)));
 
-  const currentSettlement = calculateBetSettlement(roomPlayers, roomScores, activeBetRule);
+  const hasCurrentRoundProgress = roomScores.some((score) => {
+    const rolls = Array.isArray(score?.rolls) ? score.rolls : [];
+    const frames = Array.isArray(score?.frames) ? score.frames : [];
+    return rolls.length > 0 || frames.some((frame) => frame?.mark || Number(frame?.total || 0) > 0);
+  });
+
+  const emptyCurrentSettlement = roomPlayers.map((player, index) => ({
+    userId: player.user_id,
+    name: player.player_name,
+    total: 0,
+    rank: index + 1,
+    pay: 0,
+    receive: 0,
+    net: 0,
+  }));
+
+  const currentSettlement = hasCurrentRoundProgress
+    ? calculateBetSettlement(roomPlayers, roomScores, activeBetRule)
+    : emptyCurrentSettlement;
   const cumulativeSettlement = summarizeBetSettlement(
     roomRounds.map((round) => {
       if (Array.isArray(round.settlement) && round.settlement.length > 0) return round.settlement;
@@ -81,7 +99,7 @@ export default function LiveRoom({
         <span>{roomPlayers.length}명 참여</span>
       </div>
 
-      {isFinished && roomRounds.length > 0 && (
+      {roomRounds.length > 0 && (
         <div className="cumulativeSettlementBox">
           <div className="cumulativeSettlementHeader">
             <div>
