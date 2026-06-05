@@ -84,7 +84,7 @@ function FinalSettlementModal({ settlement, onClose }) {
         </div>
 
         <div className="settlementModalFooter">
-          <p>정산 금액은 저장된 판 결과 기준입니다.</p>
+          <p>{settlement.exitMessage || "정산 금액은 저장된 판 결과 기준입니다."}</p>
           <button type="button" onClick={onClose}>확인</button>
         </div>
       </section>
@@ -897,7 +897,13 @@ const handleFinishCurrentRound = async () => {
 
 const handleFinalSettlement = async () => {
   if (!roomRounds.length) {
-    alert("정산할 완료된 판이 없습니다.");
+    setRoomNotice({
+      variant: "warning",
+      icon: "🎳",
+      badge: "정산 대기",
+      title: "아직 저장된 판이 없어요",
+      message: "현재 판 저장을 먼저 완료한 뒤 누적 정산을 진행해주세요.",
+    });
     return;
   }
 
@@ -914,7 +920,10 @@ const handleFinalSettlement = async () => {
   setFinalSettlement({
     totalGames: roomRounds.length,
     players: summary,
+    exitMessage: "정산 결과를 확인한 뒤 확인을 누르면 메인 기록 화면으로 돌아갑니다.",
   });
+
+  await handleLeaveRoom();
 };
 
   const handleCreateRoom = async ({ betAmount = 0, betRule = null } = {}) => {

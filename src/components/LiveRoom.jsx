@@ -174,6 +174,16 @@ export default function LiveRoom({
               </div>
             ))}
           </div>
+
+          <div className="finalSettlementActionBox">
+            <div>
+              <strong>게임 종료 / 누적 정산</strong>
+              <p>오늘 게임을 마치면 누적 정산 결과를 확인하고 방에서 나갑니다.</p>
+            </div>
+            <button type="button" onClick={onFinalSettlement}>
+              정산 후 방 나가기
+            </button>
+          </div>
         </div>
       )}
 
@@ -207,12 +217,9 @@ export default function LiveRoom({
             ))}
           </div>
 
-          <div className="roomRoundActions">
+          <div className="roomRoundActions single">
             <button type="button" onClick={onFinishCurrentRound}>
               전원 완료 후 현재 판 저장
-            </button>
-            <button type="button" className="secondary" onClick={onFinalSettlement}>
-              게임종료 / 누적 정산
             </button>
           </div>
         </div>

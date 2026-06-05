@@ -3114,3 +3114,51 @@ body {
     border-radius: 20px;
   }
 }
+
+.finalSettlementActionBox {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 12px;
+  align-items: center;
+  padding: 14px;
+  border-radius: 16px;
+  background: #eef2ff;
+  border: 1px solid #c7d2fe;
+}
+
+.finalSettlementActionBox strong {
+  display: block;
+  color: #0f172a;
+  font-size: 15px;
+}
+
+.finalSettlementActionBox p {
+  margin: 4px 0 0;
+  color: #64748b;
+  font-size: 13px;
+  line-height: 1.45;
+}
+
+.finalSettlementActionBox button {
+  border: 0;
+  border-radius: 14px;
+  padding: 12px 14px;
+  background: #0f172a;
+  color: white;
+  font-weight: 900;
+  white-space: nowrap;
+}
+
+.roomRoundActions.single {
+  grid-template-columns: 1fr;
+}
+
+@media (max-width: 640px) {
+  .finalSettlementActionBox {
+    grid-template-columns: 1fr;
+  }
+
+  .finalSettlementActionBox button {
+    width: 100%;
+  }
+}
