@@ -6,14 +6,48 @@ export function normalizeRoomCode(roomCode) {
   return String(roomCode || "").trim().replace(/\D/g, "").slice(0, 6);
 }
 
+export function getRoomDayKey(date = new Date()) {
+  // 방 번호는 한국 시간 기준으로 하루 단위만 유효하게 본다.
+  // 예전 날짜의 같은 6자리 방 번호가 DB에 남아 있어도 오늘 방과 섞이지 않게 한다.
+  return new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Asia/Seoul",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).format(date);
+}
+
+export function getRoomDayBounds(date = new Date()) {
+  const [year, month, day] = getRoomDayKey(date).split("-").map(Number);
+  const startUtc = new Date(Date.UTC(year, month - 1, day, -9, 0, 0, 0));
+  const endUtc = new Date(Date.UTC(year, month - 1, day + 1, -9, 0, 0, 0));
+
+  return {
+    dayKey: getRoomDayKey(date),
+    startIso: startUtc.toISOString(),
+    endIso: endUtc.toISOString(),
+  };
+}
+
+export function isRoomFromToday(room, date = new Date()) {
+  if (!room?.created_at) return false;
+
+  const createdAt = new Date(room.created_at).getTime();
+  const { startIso, endIso } = getRoomDayBounds(date);
+  return createdAt >= new Date(startIso).getTime() && createdAt < new Date(endIso).getTime();
+}
+
 async function roomCodeExists(client, roomCode) {
   const normalizedCode = normalizeRoomCode(roomCode);
   if (normalizedCode.length !== 6) return true;
 
+  const { startIso, endIso } = getRoomDayBounds();
   const { data, error } = await client
     .from("bowling_rooms")
     .select("id")
     .eq("room_code", normalizedCode)
+    .gte("created_at", startIso)
+    .lt("created_at", endIso)
     .limit(1);
 
   if (error) throw error;
@@ -23,15 +57,8 @@ async function roomCodeExists(client, roomCode) {
 async function generateUnusedRoomCode(client, maxAttempts = 30) {
   for (let attempt = 0; attempt < maxAttempts; attempt += 1) {
     const roomCode = generateRoomCode();
-    // 이전 방 기록이 남아 있어도 같은 6자리 코드는 재사용하지 않는다.
-    // 그래야 방 참여 시 예전 방과 새 방이 섞이지 않는다.
-    // DB에 unique index가 있으면 동시 생성까지 더 안전하게 막을 수 있다.
-    // 앱 단에서도 먼저 중복을 피해서 사용자가 겪는 충돌을 줄인다.
-    //
-    // 참고: bowling_rooms.room_code가 기존 데이터에 중복으로 남아 있으면
-    // findRoomByCode는 최신 방 하나를 선택하도록 아래에서 방어한다.
-    // 신규 생성은 여기서 중복을 피한다.
-    //
+    // 같은 날짜 안에서만 6자리 방 번호 중복을 피한다.
+    // 어제 이전 방 데이터가 DB에 남아 있어도 오늘 새 방 생성/입장과 섞이지 않는다.
     // 6자리 숫자는 90만 개라 일반 사용량에서는 30회 내 성공 가능성이 매우 높다.
     // 실패하면 Supabase 에러가 아니라 명확한 안내 에러를 던진다.
     //
@@ -75,16 +102,19 @@ export async function findRoomByCode(client, roomCode) {
     throw new Error("6자리 방 코드를 입력해주세요.");
   }
 
+  const { startIso, endIso } = getRoomDayBounds();
   const { data: rooms, error } = await client
     .from("bowling_rooms")
     .select("*")
     .eq("room_code", normalizedCode)
+    .gte("created_at", startIso)
+    .lt("created_at", endIso)
     .order("created_at", { ascending: false })
     .limit(1);
 
   if (error) throw error;
   const room = Array.isArray(rooms) ? rooms[0] : null;
-  if (!room) throw new Error("방을 찾을 수 없습니다.");
+  if (!room) throw new Error("오늘 생성된 방을 찾을 수 없습니다.");
   return room;
 }
 
@@ -94,9 +124,10 @@ export async function findRoomById(client, roomId) {
     .from("bowling_rooms")
     .select("*")
     .eq("id", roomId)
-    .single();
+    .maybeSingle();
 
   if (error) throw error;
+  if (!room || !isRoomFromToday(room)) return null;
   return room;
 }
 

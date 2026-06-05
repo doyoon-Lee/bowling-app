@@ -23,7 +23,7 @@ import ProMode from "./components/ProMode";
 import Scoreboard from "./components/Scoreboard";
 
 import { APP_LOGGED_OUT_KEY, createGuestName, getDisplayUserName, getUserEmail, isEmailLikeDisplayName, isGuestUser, isInAppBrowser, openCurrentPageInExternalBrowser } from "./utils/auth";
-import { createRoom, findRoomByCode, findRoomById, joinRoomById, upsertRoomScore, saveRoomGameRound, fetchRoomGameRounds, clearRoomScores, leaveRoomById } from "./utils/room";
+import { createRoom, findRoomByCode, findRoomById, joinRoomById, upsertRoomScore, saveRoomGameRound, fetchRoomGameRounds, clearRoomScores, leaveRoomById, getRoomDayKey } from "./utils/room";
 import { createBetRule, calculateBetSettlement, summarizeBetSettlement, ensureBetRule } from "./utils/betting";
 import { groupRecordsByDate } from "./utils/date";
 import { getCachedSupabaseClient, getSupabaseClient } from "./utils/supabaseClient";
@@ -38,6 +38,18 @@ const getLiveRoomCacheKey = (userId) => `${LIVE_ROOM_CACHE_PREFIX}:${userId || "
 const getLiveRoomDraftKey = (roomId, userId) => `${LIVE_ROOM_DRAFT_PREFIX}:${roomId || "no-room"}:${userId || "anonymous"}`;
 
 const getPlayerNameForRoom = (playerName, user) => playerName?.trim() || getDisplayUserName(user);
+
+const makeLiveRoomCacheValue = (room, betAmount = 0, betRule = null) => {
+  const savedBetAmount = Number(room?.bet_amount || betAmount || 0);
+
+  return {
+    roomId: room?.id,
+    roomCode: room?.room_code,
+    betAmount: savedBetAmount,
+    betRule: ensureBetRule(room?.bet_rule || betRule, savedBetAmount),
+    dayKey: getRoomDayKey(),
+  };
+};
 
 const saveLiveRoomDraft = ({ roomId, userId, rolls, pinFrames }) => {
   if (!roomId || !userId) return;
@@ -160,12 +172,21 @@ export default function App() {
 
       if (!cachedRoom?.roomId) return;
 
+      if (cachedRoom.dayKey && cachedRoom.dayKey !== getRoomDayKey()) {
+        localStorage.removeItem(getLiveRoomCacheKey(user.id));
+        return;
+      }
+
       const client = await getSupabaseClient();
       if (!client || !mounted) return;
 
       try {
         const room = await findRoomById(client, cachedRoom.roomId);
-        if (!room || !mounted) return;
+        if (!room) {
+          localStorage.removeItem(getLiveRoomCacheKey(user.id));
+          return;
+        }
+        if (!mounted) return;
 
         await joinRoomById(client, {
           roomId: room.id,
@@ -647,7 +668,7 @@ const handleFinalSettlement = async () => {
 
       localStorage.setItem(
         getLiveRoomCacheKey(user.id),
-        JSON.stringify({ roomId: room.id, roomCode: room.room_code, betAmount: Number(room.bet_amount || betAmount || 0), betRule: ensureBetRule(room.bet_rule || betRule, Number(room.bet_amount || betAmount || 0)) })
+        JSON.stringify(makeLiveRoomCacheValue(room, betAmount, betRule))
       );
 
       setRoomPlayers([{ room_id: room.id, user_id: user.id, player_name: roomPlayerName }]);
@@ -685,7 +706,7 @@ const handleFinalSettlement = async () => {
 
       localStorage.setItem(
         getLiveRoomCacheKey(user.id),
-        JSON.stringify({ roomId: room.id, roomCode: room.room_code, betAmount: Number(room.bet_amount || 0), betRule: ensureBetRule(room.bet_rule, Number(room.bet_amount || 0)) })
+        JSON.stringify(makeLiveRoomCacheValue(room))
       );
 
       setRoomPlayers((prev) => {
@@ -700,7 +721,7 @@ const handleFinalSettlement = async () => {
       setAppMode("room");
     } catch (error) {
       console.warn("Room join failed:", error);
-      alert("방 번호를 다시 확인해주세요.");
+      alert(error?.message || "방 번호를 다시 확인해주세요.");
     }
   };
 
