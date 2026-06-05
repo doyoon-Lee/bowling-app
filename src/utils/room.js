@@ -66,7 +66,7 @@ export async function joinRoomById(client, { roomId, userId, playerName }) {
   if (error) throw error;
 }
 
-export async function upsertRoomScore(client, { roomId, userId, playerName, rolls, frames, total }) {
+export async function upsertRoomScore(client, { roomId, userId, playerName, rolls, frames, total, roundCompleted = false, currentRound = 1 }) {
   if (!roomId || !userId) return;
 
   const { error } = await client.from("bowling_room_scores").upsert(
@@ -77,6 +77,8 @@ export async function upsertRoomScore(client, { roomId, userId, playerName, roll
       rolls,
       frames,
       total,
+      round_completed: Boolean(roundCompleted),
+      current_round: Number(currentRound || 1),
     },
     { onConflict: "room_id,user_id" }
   );

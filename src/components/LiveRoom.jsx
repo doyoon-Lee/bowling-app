@@ -71,7 +71,7 @@ export default function LiveRoom({
       <div className="liveRoomBoardHeader">
         <div>
           <h2>실시간 점수판</h2>
-          <p>현재 판을 종료하면 결과가 누적되고, 점수판은 다음 판 입력용으로 초기화됩니다.</p>
+          <p>모든 플레이어가 10프레임까지 입력되면 현재 판을 저장하고 다음 판으로 넘어갈 수 있습니다.</p>
         </div>
         <span>{roomPlayers.length}명 참여</span>
       </div>
@@ -146,7 +146,7 @@ export default function LiveRoom({
 
           <div className="roomRoundActions">
             <button type="button" onClick={onFinishCurrentRound}>
-              현재 판 저장하고 다음 판 시작
+              전원 완료 후 현재 판 저장
             </button>
             <button type="button" className="secondary" onClick={onFinalSettlement}>
               게임종료 / 누적 정산

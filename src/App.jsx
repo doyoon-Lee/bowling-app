@@ -528,7 +528,12 @@ const handleFinishCurrentRound = async () => {
   });
 
   if (!allFinished) {
-    alert("모든 플레이어가 10프레임까지 입력해야 현재 판을 종료할 수 있습니다.");
+    const incompletePlayers = roomPlayers.filter((player) => {
+      const score = scoresByUser.get(player.user_id);
+      return !score || (score.frames || []).length < 10 || typeof score.total !== "number";
+    });
+
+    alert(`아직 기록이 필요한 플레이어가 있습니다.\n${incompletePlayers.map((player) => `- ${player.player_name}`).join("\n")}`);
     return;
   }
 
@@ -1121,6 +1126,8 @@ const handleFinalSettlement = async () => {
         rolls: nextRolls,
         frames: nextResult.frames,
         total: nextResult.total,
+        roundCompleted: (nextResult.frames || []).length >= 10,
+        currentRound: roomRounds.length + 1,
       });
       setLiveSyncStatus("자동 저장됨");
     } catch (error) {
@@ -1168,12 +1175,49 @@ const handleFinalSettlement = async () => {
   };
 
   const reset = () => {
+    if (appMode === "room" && rolls.length > 0) {
+      const ok = window.confirm("실시간 방에서 현재 입력 중인 내 점수를 초기화할까요? 다른 사람의 기록과 저장된 판은 유지됩니다.");
+      if (!ok) return;
+    }
+
     setRolls([]);
     setPinFrames([]);
   };
 
   const saveGame = async () => {
     if (rolls.length === 0 || isSaving) return;
+
+    if (appMode === "room") {
+      await syncRoomScoreLive(rolls);
+
+      const nextResult = calcBowlingScore(rolls);
+      const isMyGameComplete = (nextResult.frames || []).length >= 10;
+
+      if (!isMyGameComplete) {
+        alert("실시간 방에서는 저장 버튼으로 판이 종료되지 않습니다. 10프레임까지 입력한 뒤 현재 판 저장 버튼을 눌러주세요.");
+        return;
+      }
+
+      const scoresByUser = new Map(roomScores.map((score) => [score.user_id, score]));
+      scoresByUser.set(user.id, {
+        user_id: user.id,
+        frames: nextResult.frames,
+        total: nextResult.total,
+      });
+
+      const incompletePlayers = roomPlayers.filter((player) => {
+        const score = scoresByUser.get(player.user_id);
+        return !score || (score.frames || []).length < 10 || typeof score.total !== "number";
+      });
+
+      if (incompletePlayers.length > 0) {
+        alert(`아직 기록이 필요한 플레이어가 있습니다.\n${incompletePlayers.map((player) => `- ${player.player_name}`).join("\n")}`);
+        return;
+      }
+
+      alert("모든 플레이어 기록이 완료되었습니다. 아래 '현재 판 저장하고 다음 판 시작' 버튼을 눌러 판을 저장해주세요.");
+      return;
+    }
 
     if (!playerName.trim()) {
       alert("이름을 넣어주세요.");
