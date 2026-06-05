@@ -63,11 +63,9 @@ export function createBetRule({ mode = BET_RULE_MODES.NONE, baseAmount = 0, cust
     pay: normalizeMoney(rule.pay),
   }));
 
-  const inferredBaseAmount = normalizedCustomRules.reduce((max, rule) => Math.max(max, Number(rule.pay || 0)), amount);
-
   return {
     mode: BET_RULE_MODES.CUSTOM_RANK,
-    baseAmount: inferredBaseAmount,
+    baseAmount: amount,
     customRules: normalizedCustomRules,
   };
 }
@@ -157,9 +155,13 @@ export function summarizeBetSettlement(settlementsByGame = []) {
 
 export function ensureBetRule(betRule, betAmount = 0) {
   if (betRule?.mode && betRule.mode !== BET_RULE_MODES.NONE) {
+    const explicitBetAmount = normalizeMoney(betAmount);
+    const ruleBaseAmount = normalizeMoney(betRule.baseAmount);
+    const baseAmount = explicitBetAmount > 0 ? explicitBetAmount : ruleBaseAmount;
+
     return createBetRule({
       mode: betRule.mode,
-      baseAmount: betRule.baseAmount ?? betAmount,
+      baseAmount,
       customRules: betRule.customRules || [],
     });
   }

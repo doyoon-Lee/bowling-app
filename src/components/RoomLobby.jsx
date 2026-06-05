@@ -18,11 +18,9 @@ export default function RoomLobby({ appMode, roomCode, onCreateRoom, onJoinRoom,
   }, [normalizedBaseAmount, betMode]);
 
   const createRoomWithBet = () => {
-    const customBaseAmount = customRules.reduce((max, rule) => Math.max(max, normalizeMoney(rule.pay)), 0);
-
     const betRule = createBetRule({
       mode: betMode,
-      baseAmount: betMode === BET_RULE_MODES.CUSTOM_RANK ? customBaseAmount : normalizedBaseAmount,
+      baseAmount: normalizedBaseAmount,
       customRules,
     });
 
