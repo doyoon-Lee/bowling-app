@@ -10,6 +10,7 @@ import {
   repairTenthFrameRolls,
   getCumulativeScoresFromData,
   repairGeminiFramesByCumulativeScores,
+  isCompleteGameRolls,
 } from "./utils/bowling";
 
 import AuthScreen from "./components/AuthScreen";
@@ -643,28 +644,55 @@ const handleFinishCurrentRound = async () => {
   const client = await getSupabaseClient();
   if (!client || !roomId || !roomCode || roomPlayers.length === 0) return;
 
-  const scoresByUser = new Map(roomScores.map((score) => [score.user_id, score]));
-  const incompletePlayers = roomPlayers.filter((player) => {
-    const score = scoresByUser.get(player.user_id);
-    return !score || (score.frames || []).length < 10 || typeof score.total !== "number";
-  });
-
-  if (incompletePlayers.length > 0) {
-    alert(`아직 기록이 필요한 플레이어가 있습니다.\n${incompletePlayers.map((player) => `- ${player.player_name}`).join("\n")}`);
-    return;
-  }
-
   try {
-    const nextRoundNumber = roomRounds.length + 1;
+    const [{ data: latestPlayers, error: playersError }, { data: latestScores, error: scoresError }, latestRounds] = await Promise.all([
+      client
+        .from("bowling_room_players")
+        .select("*")
+        .eq("room_id", roomId)
+        .order("created_at", { ascending: true }),
+      client
+        .from("bowling_room_scores")
+        .select("*")
+        .eq("room_id", roomId)
+        .order("updated_at", { ascending: false }),
+      fetchRoomGameRounds(client, roomId),
+    ]);
+
+    if (playersError) throw playersError;
+    if (scoresError) throw scoresError;
+
+    const activePlayers = latestPlayers || [];
+    const activeScores = latestScores || [];
+
+    if (activePlayers.length === 0) return;
+
+    setRoomPlayers(activePlayers);
+    setRoomScores(activeScores);
+    setRoomRounds(latestRounds || []);
+
+    const scoresByUser = new Map(activeScores.map((score) => [score.user_id, score]));
+    const incompletePlayers = activePlayers.filter((player) => {
+      const score = scoresByUser.get(player.user_id);
+      const rolls = Array.isArray(score?.rolls) ? score.rolls : [];
+      return !score || !isCompleteGameRolls(rolls);
+    });
+
+    if (incompletePlayers.length > 0) {
+      alert(`아직 10프레임까지 기록이 완료되지 않은 플레이어가 있습니다.\n${incompletePlayers.map((player) => `- ${player.player_name}`).join("\n")}`);
+      return;
+    }
+
+    const nextRoundNumber = (latestRounds || []).length + 1;
     const activeBetRule = ensureBetRule(roomBetRule, roomBetAmount);
-    const settlement = calculateBetSettlement(roomPlayers, roomScores, activeBetRule);
+    const settlement = calculateBetSettlement(activePlayers, activeScores, activeBetRule);
 
     await saveRoomGameRound(client, {
       roomId,
       roomCode,
       roundNumber: nextRoundNumber,
-      players: roomPlayers,
-      scores: roomScores,
+      players: activePlayers,
+      scores: activeScores,
       betRule: activeBetRule,
       settlement,
     });

@@ -1,5 +1,5 @@
 import React, { useEffect, useRef } from "react";
-import { displayTotal, getFrameRollLimit, renderFrameMark } from "../utils/bowling.jsx";
+import { displayTotal, getFrameRollLimit, isCompleteGameRolls, renderFrameMark } from "../utils/bowling.jsx";
 import { BET_RULE_MODES, calculateBetSettlement, getBetRuleTitle, summarizeBetSettlement, ensureBetRule } from "../utils/betting";
 
 
@@ -46,9 +46,8 @@ function MiniFrameScoreboard({ frames, rolls = [] }) {
 }
 
 function isPlayerGameComplete(score) {
-  const frames = score?.frames || [];
-  const tenthFrame = frames[9];
-  return frames.length >= 10 && tenthFrame && typeof score?.total === "number";
+  const rolls = Array.isArray(score?.rolls) ? score.rolls : [];
+  return isCompleteGameRolls(rolls);
 }
 
 function getRankLabel(rank) {
