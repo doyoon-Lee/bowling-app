@@ -2071,3 +2071,10 @@ body {
   overflow-y: auto;
   padding-right: 2px;
 }
+
+.liveSyncStatus {
+  margin: 8px 2px 0;
+  text-align: center;
+  font-size: 12px;
+  color: #64748b;
+}

@@ -29,12 +29,76 @@ import { getCachedSupabaseClient, getSupabaseClient } from "./utils/supabaseClie
 
 const BOWLING_RECORD_CACHE_PREFIX = "bowling_records_cache_v1";
 const LIVE_ROOM_CACHE_PREFIX = "bowling_live_room_v1";
+const LIVE_ROOM_DRAFT_PREFIX = "bowling_live_score_draft_v1";
+
+
+const formatGeminiErrorMessage = (status, data, fallbackText = "") => {
+  const raw = [
+    fallbackText,
+    data?.error,
+    data?.message,
+    data?.detail,
+    typeof data === "string" ? data : "",
+    data ? JSON.stringify(data) : "",
+  ]
+    .filter(Boolean)
+    .join(" ");
+
+  if (status === 429 || /RESOURCE_EXHAUSTED|quota|credits?|payment|billing|depleted/i.test(raw)) {
+    return "AI 사진 분석 사용량이 초과되었습니다. Gemini API 결제/크레딧 상태를 확인한 뒤 다시 시도해주세요.";
+  }
+
+  if (status === 503 || /UNAVAILABLE|overloaded|busy/i.test(raw)) {
+    return "Gemini 서버가 일시적으로 불안정합니다. 잠시 후 다시 시도해주세요.";
+  }
+
+  if (status === 401 || status === 403 || /API_KEY|permission|unauthorized|forbidden/i.test(raw)) {
+    return "Gemini API 인증 또는 권한 설정을 확인해주세요.";
+  }
+
+  if (status >= 500) {
+    return "사진 분석 서버에서 오류가 발생했습니다. 잠시 후 다시 시도해주세요.";
+  }
+
+  return "사진 분석 중 오류가 발생했습니다. 사진을 다시 선택하거나 잠시 후 다시 시도해주세요.";
+};
 
 
 const getRecordCacheKey = (userId) => `${BOWLING_RECORD_CACHE_PREFIX}:${userId || "anonymous"}`;
 const getLiveRoomCacheKey = (userId) => `${LIVE_ROOM_CACHE_PREFIX}:${userId || "anonymous"}`;
+const getLiveRoomDraftKey = (roomId, userId) => `${LIVE_ROOM_DRAFT_PREFIX}:${roomId || "no-room"}:${userId || "anonymous"}`;
 
 const getPlayerNameForRoom = (playerName, user) => playerName?.trim() || getDisplayUserName(user);
+
+const saveLiveRoomDraft = ({ roomId, userId, rolls, pinFrames }) => {
+  if (!roomId || !userId) return;
+
+  try {
+    localStorage.setItem(
+      getLiveRoomDraftKey(roomId, userId),
+      JSON.stringify({
+        rolls: Array.isArray(rolls) ? rolls : [],
+        pinFrames: Array.isArray(pinFrames) ? pinFrames : [],
+        savedAt: new Date().toISOString(),
+      })
+    );
+  } catch (error) {
+    console.warn("Failed to save live room draft:", error);
+  }
+};
+
+const readLiveRoomDraft = (roomId, userId) => {
+  if (!roomId || !userId) return null;
+
+  try {
+    const draft = JSON.parse(localStorage.getItem(getLiveRoomDraftKey(roomId, userId)) || "null");
+    if (!draft || !Array.isArray(draft.rolls)) return null;
+    return draft;
+  } catch (error) {
+    console.warn("Failed to read live room draft:", error);
+    return null;
+  }
+};
 
 
 const mergeRecordsById = (...recordGroups) => {
@@ -65,6 +129,7 @@ export default function App() {
   const [roomPlayers, setRoomPlayers] = useState([]);
   const [roomScores, setRoomScores] = useState([]);
   const roomChannelRef = useRef(null);
+  const liveRoomReadyRef = useRef(false);
 
   const [playerName, setPlayerName] = useState("");
   const [place, setPlace] = useState("");
@@ -90,6 +155,7 @@ export default function App() {
   const [pinFrames, setPinFrames] = useState([]);
   const [records, setRecords] = useState([]);
   const [isSaving, setIsSaving] = useState(false);
+  const [liveSyncStatus, setLiveSyncStatus] = useState("");
 
   const scoreboardRef = useRef(null);
   const user = session?.user;
@@ -262,6 +328,8 @@ export default function App() {
 
 
   useEffect(() => {
+    liveRoomReadyRef.current = false;
+
     if (!roomId) {
       setRoomPlayers([]);
       setRoomScores([]);
@@ -269,6 +337,7 @@ export default function App() {
     }
 
     let channel;
+    let pollingTimer;
     let mounted = true;
 
     async function subscribeRoom() {
@@ -294,6 +363,8 @@ export default function App() {
       };
 
       await fetchRoomData();
+
+      pollingTimer = window.setInterval(fetchRoomData, 3000);
 
       channel = client
         .channel(`room-${roomId}`)
@@ -328,8 +399,51 @@ export default function App() {
       mounted = false;
       const cached = getCachedSupabaseClient();
       if (channel && cached) cached.removeChannel(channel);
+      if (typeof pollingTimer !== "undefined") window.clearInterval(pollingTimer);
     };
   }, [roomId]);
+
+  useEffect(() => {
+    if (appMode !== "room" || !roomId || !user?.id) return;
+
+    let mounted = true;
+
+    async function restoreLiveRoomScore() {
+      try {
+        const draft = readLiveRoomDraft(roomId, user.id);
+
+        if (draft?.rolls?.length) {
+          setRolls(draft.rolls);
+          setPinFrames(Array.isArray(draft.pinFrames) ? draft.pinFrames : []);
+          return;
+        }
+
+        const client = await getSupabaseClient();
+        if (!client || !mounted) return;
+
+        const { data, error } = await client
+          .from("bowling_room_scores")
+          .select("rolls, frames")
+          .eq("room_id", roomId)
+          .eq("user_id", user.id)
+          .maybeSingle();
+
+        if (!mounted || error || !data) return;
+
+        if (Array.isArray(data.rolls) && data.rolls.length) {
+          setRolls(data.rolls);
+        }
+      } finally {
+        if (mounted) liveRoomReadyRef.current = true;
+      }
+    }
+
+    restoreLiveRoomScore();
+
+    return () => {
+      mounted = false;
+    };
+  }, [appMode, roomId, user?.id]);
 
   const signInWithProvider = async (provider) => {
     localStorage.removeItem(APP_LOGGED_OUT_KEY);
@@ -395,6 +509,7 @@ export default function App() {
 
     if (user?.id) {
       localStorage.removeItem(getLiveRoomCacheKey(user.id));
+      if (roomId) localStorage.removeItem(getLiveRoomDraftKey(roomId, user.id));
     }
 
     if (isGuestUser(user)) {
@@ -485,6 +600,7 @@ export default function App() {
 
     if (user?.id) {
       localStorage.removeItem(getLiveRoomCacheKey(user.id));
+      if (roomId) localStorage.removeItem(getLiveRoomDraftKey(roomId, user.id));
     }
 
     setAppMode("solo");
@@ -833,19 +949,7 @@ export default function App() {
       }
 
       if (!response.ok) {
-        if (response.status === 503) {
-          setCameraMessage("Gemini 서버 사용량이 많습니다. 잠시 후 다시 시도해주세요.");
-          return;
-        }
-
-        if (response.status === 429) {
-          setCameraMessage("AI 사용량 제한에 도달했습니다. 잠시 후 다시 시도해주세요.");
-          return;
-        }
-
-        setCameraMessage(
-          `사진 분석 오류 (${response.status}): ${data?.error || "알 수 없는 오류"}${data?.detail ? ` / ${data.detail}` : ""}`
-        );
+        setCameraMessage(formatGeminiErrorMessage(response.status, data, responseText));
         return;
       }
 
@@ -881,7 +985,7 @@ export default function App() {
       setCameraMessage("Gemini 분석 결과를 확인한 뒤 맞으면 적용해주세요.");
     } catch (error) {
       console.error("Gemini Analyze Error:", error);
-      setCameraMessage(`사진 분석 중 오류 발생: ${error?.message || "알 수 없는 오류"}`);
+      setCameraMessage(formatGeminiErrorMessage(0, null, error?.message || ""));
     } finally {
       setIsAnalyzingScoreImage(false);
     }
@@ -909,28 +1013,52 @@ export default function App() {
   const syncRoomScoreLive = async (nextRolls) => {
     if (appMode !== "room" || !roomId || !user) return;
 
-    const client = await getSupabaseClient();
-    if (!client) return;
-
     const nextResult = calcBowlingScore(nextRolls);
+    const roomPlayerName = getPlayerNameForRoom(playerName, user);
+
+    saveLiveRoomDraft({
+      roomId,
+      userId: user.id,
+      rolls: nextRolls,
+      pinFrames,
+    });
+
     const optimisticScore = {
       room_id: roomId,
       user_id: user.id,
-      player_name: getPlayerNameForRoom(playerName, user),
+      player_name: roomPlayerName,
       total: nextResult.total,
       rolls: nextRolls,
       frames: nextResult.frames,
       updated_at: new Date().toISOString(),
     };
 
+    setLiveSyncStatus("자동 저장 중...");
     setRoomScores((prev) => {
       const others = prev.filter((score) => score.user_id !== user.id);
       return [optimisticScore, ...others];
     });
 
-    await client.from("bowling_room_scores").upsert(optimisticScore, {
-      onConflict: "room_id,user_id",
-    });
+    const client = await getSupabaseClient();
+    if (!client) {
+      setLiveSyncStatus("로컬 임시저장됨");
+      return;
+    }
+
+    try {
+      await upsertRoomScore(client, {
+        roomId,
+        userId: user.id,
+        playerName: roomPlayerName,
+        rolls: nextRolls,
+        frames: nextResult.frames,
+        total: nextResult.total,
+      });
+      setLiveSyncStatus("자동 저장됨");
+    } catch (error) {
+      console.error("Live room score sync failed:", error);
+      setLiveSyncStatus("동기화 실패 - 로컬 보관됨");
+    }
   };
 
   useEffect(() => {
@@ -958,8 +1086,9 @@ export default function App() {
 
   useEffect(() => {
     if (appMode !== "room" || !roomId || !user) return;
+    if (!liveRoomReadyRef.current) return;
     syncRoomScoreLive(rolls);
-  }, [rolls, appMode, roomId, user?.id]);
+  }, [rolls, pinFrames, playerName, appMode, roomId, user?.id]);
 
   const addRoll = (pins) => {
     if (!next || pins > next.max) return;
@@ -1154,6 +1283,10 @@ export default function App() {
               {isSaving ? "저장 중" : "저장"}
             </button>
           </div>
+
+          {appMode === "room" && liveSyncStatus && (
+            <p className="liveSyncStatus">{liveSyncStatus}</p>
+          )}
         </section>
 
         {isCameraModalOpen && (
