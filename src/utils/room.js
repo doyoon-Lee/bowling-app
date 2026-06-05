@@ -86,6 +86,24 @@ export async function upsertRoomScore(client, { roomId, userId, playerName, roll
   if (error) throw error;
 }
 
+
+export async function deleteRoomPlayerScore(client, { roomId, userId, currentRound }) {
+  if (!roomId || !userId) return;
+
+  let query = client
+    .from("bowling_room_scores")
+    .delete()
+    .eq("room_id", roomId)
+    .eq("user_id", userId);
+
+  if (currentRound) {
+    query = query.eq("current_round", Number(currentRound));
+  }
+
+  const { error } = await query;
+  if (error) throw error;
+}
+
 export async function saveRoomGameRound(client, { roomId, roomCode, roundNumber, players, scores, betRule, settlement }) {
   if (!roomId || !roomCode) return null;
 

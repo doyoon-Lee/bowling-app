@@ -24,7 +24,7 @@ import ProMode from "./components/ProMode";
 import Scoreboard from "./components/Scoreboard";
 
 import { APP_LOGGED_OUT_KEY, createGuestName, getDisplayUserName, getUserEmail, isEmailLikeDisplayName, isGuestUser, isInAppBrowser, openCurrentPageInExternalBrowser } from "./utils/auth";
-import { createRoom, findRoomByCode, findRoomById, joinRoomById, upsertRoomScore, saveRoomGameRound, fetchRoomGameRounds, clearRoomScores, leaveRoomById } from "./utils/room";
+import { createRoom, findRoomByCode, findRoomById, joinRoomById, upsertRoomScore, deleteRoomPlayerScore, saveRoomGameRound, fetchRoomGameRounds, clearRoomScores, leaveRoomById } from "./utils/room";
 import { createBetRule, calculateBetSettlement, summarizeBetSettlement, ensureBetRule } from "./utils/betting";
 import { groupRecordsByDate } from "./utils/date";
 import { getCachedSupabaseClient, getSupabaseClient } from "./utils/supabaseClient";
@@ -92,7 +92,7 @@ function FinalSettlementModal({ settlement, onClose }) {
   );
 }
 
-const saveLiveRoomDraft = ({ roomId, userId, rolls, pinFrames }) => {
+const saveLiveRoomDraft = ({ roomId, userId, rolls, pinFrames, currentRound }) => {
   if (!roomId || !userId) return;
 
   try {
@@ -101,6 +101,7 @@ const saveLiveRoomDraft = ({ roomId, userId, rolls, pinFrames }) => {
       JSON.stringify({
         rolls: Array.isArray(rolls) ? rolls : [],
         pinFrames: Array.isArray(pinFrames) ? pinFrames : [],
+        currentRound: Number(currentRound || 1),
         savedAt: new Date().toISOString(),
       })
     );
@@ -417,12 +418,6 @@ const resetLocalRoomScoreForNextRound = () => {
           .eq("room_id", roomId)
           .order("created_at", { ascending: true });
 
-        const { data: scores } = await client
-          .from("bowling_room_scores")
-          .select("*")
-          .eq("room_id", roomId)
-          .order("updated_at", { ascending: false });
-
         const { data: room } = await client
           .from("bowling_rooms")
           .select("id, room_code, bet_amount, bet_rule, current_round")
@@ -435,6 +430,14 @@ const resetLocalRoomScoreForNextRound = () => {
           .eq("room_id", roomId)
           .order("round_number", { ascending: true })
           .order("created_at", { ascending: true });
+
+        const activeRoundNumber = (rounds || []).length + 1;
+        const { data: scores } = await client
+          .from("bowling_room_scores")
+          .select("*")
+          .eq("room_id", roomId)
+          .eq("current_round", activeRoundNumber)
+          .order("updated_at", { ascending: false });
 
         if (!mounted) return;
         setRoomPlayers(players || []);
@@ -509,9 +512,10 @@ const resetLocalRoomScoreForNextRound = () => {
 
     async function restoreLiveRoomScore() {
       try {
+        const activeRoundNumber = roomRounds.length + 1;
         const draft = readLiveRoomDraft(roomId, user.id);
 
-        if (draft?.rolls?.length) {
+        if (draft?.rolls?.length && Number(draft.currentRound || 1) === activeRoundNumber) {
           setRolls(draft.rolls);
           setPinFrames(Array.isArray(draft.pinFrames) ? draft.pinFrames : []);
           return;
@@ -525,6 +529,7 @@ const resetLocalRoomScoreForNextRound = () => {
           .select("rolls, frames")
           .eq("room_id", roomId)
           .eq("user_id", user.id)
+          .eq("current_round", activeRoundNumber)
           .maybeSingle();
 
         if (!mounted || error || !data) return;
@@ -542,7 +547,7 @@ const resetLocalRoomScoreForNextRound = () => {
     return () => {
       mounted = false;
     };
-  }, [appMode, roomId, user?.id]);
+  }, [appMode, roomId, user?.id, roomRounds.length]);
 
   const signInWithProvider = async (provider) => {
     localStorage.removeItem(APP_LOGGED_OUT_KEY);
@@ -645,7 +650,10 @@ const handleFinishCurrentRound = async () => {
   if (!client || !roomId || !roomCode || roomPlayers.length === 0) return;
 
   try {
-    const [{ data: latestPlayers, error: playersError }, { data: latestScores, error: scoresError }, latestRounds] = await Promise.all([
+    const latestRounds = await fetchRoomGameRounds(client, roomId);
+    const activeRoundNumber = (latestRounds || []).length + 1;
+
+    const [{ data: latestPlayers, error: playersError }, { data: latestScores, error: scoresError }] = await Promise.all([
       client
         .from("bowling_room_players")
         .select("*")
@@ -655,8 +663,8 @@ const handleFinishCurrentRound = async () => {
         .from("bowling_room_scores")
         .select("*")
         .eq("room_id", roomId)
+        .eq("current_round", activeRoundNumber)
         .order("updated_at", { ascending: false }),
-      fetchRoomGameRounds(client, roomId),
     ]);
 
     if (playersError) throw playersError;
@@ -1258,6 +1266,29 @@ const handleFinalSettlement = async () => {
   const syncRoomScoreLive = async (nextRolls) => {
     if (appMode !== "room" || !roomId || !user) return;
 
+    const activeRoundNumber = roomRounds.length + 1;
+
+    if (!Array.isArray(nextRolls) || nextRolls.length === 0) {
+      localStorage.removeItem(getLiveRoomDraftKey(roomId, user.id));
+      setRoomScores((prev) => prev.filter((score) => score.user_id !== user.id));
+
+      const client = await getSupabaseClient();
+      if (client) {
+        try {
+          await deleteRoomPlayerScore(client, {
+            roomId,
+            userId: user.id,
+            currentRound: activeRoundNumber,
+          });
+        } catch (error) {
+          console.error("Live room empty score cleanup failed:", error);
+        }
+      }
+
+      setLiveSyncStatus("기록 대기 중");
+      return;
+    }
+
     const nextResult = calcBowlingScore(nextRolls);
     const roomPlayerName = getPlayerNameForRoom(playerName, user);
 
@@ -1266,6 +1297,7 @@ const handleFinalSettlement = async () => {
       userId: user.id,
       rolls: nextRolls,
       pinFrames,
+      currentRound: activeRoundNumber,
     });
 
     const optimisticScore = {
@@ -1275,6 +1307,7 @@ const handleFinalSettlement = async () => {
       total: nextResult.total,
       rolls: nextRolls,
       frames: nextResult.frames,
+      current_round: activeRoundNumber,
       updated_at: new Date().toISOString(),
     };
 
@@ -1299,7 +1332,7 @@ const handleFinalSettlement = async () => {
         frames: nextResult.frames,
         total: nextResult.total,
         roundCompleted: (nextResult.frames || []).length >= 10,
-        currentRound: roomRounds.length + 1,
+        currentRound: activeRoundNumber,
       });
       setLiveSyncStatus("자동 저장됨");
     } catch (error) {
@@ -1373,13 +1406,15 @@ const handleFinalSettlement = async () => {
       const scoresByUser = new Map(roomScores.map((score) => [score.user_id, score]));
       scoresByUser.set(user.id, {
         user_id: user.id,
+        rolls,
         frames: nextResult.frames,
         total: nextResult.total,
       });
 
       const incompletePlayers = roomPlayers.filter((player) => {
         const score = scoresByUser.get(player.user_id);
-        return !score || (score.frames || []).length < 10 || typeof score.total !== "number";
+        const scoreRolls = Array.isArray(score?.rolls) ? score.rolls : [];
+        return !score || !isCompleteGameRolls(scoreRolls) || typeof score.total !== "number";
       });
 
       if (incompletePlayers.length > 0) {
