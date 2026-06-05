@@ -565,7 +565,8 @@ export default function App() {
       setRoomBetRule(room.bet_rule || createBetRule({ mode: "none" }));
       setAppMode("room");
     } catch (error) {
-      alert(`방 참여 실패: ${error.message}`);
+      console.warn("Room join failed:", error);
+      alert("방 번호를 다시 확인해주세요.");
     }
   };
 
