@@ -81,7 +81,7 @@ export default function LiveRoom({
         <span>{roomPlayers.length}명 참여</span>
       </div>
 
-      {roomRounds.length > 0 && (
+      {isFinished && roomRounds.length > 0 && (
         <div className="cumulativeSettlementBox">
           <div className="cumulativeSettlementHeader">
             <div>
