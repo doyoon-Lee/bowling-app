@@ -2395,3 +2395,122 @@ body {
 }
 
 /* Custom rank mode uses only rank amount inputs; preset amount buttons are intentionally hidden in JSX. */
+
+
+.gameResultBox {
+  display: grid;
+  gap: 12px;
+  padding: 16px;
+  border: 1px solid #bfdbfe;
+  border-radius: 18px;
+  background: linear-gradient(180deg, #eff6ff 0%, #ffffff 100%);
+  margin-bottom: 14px;
+}
+
+.gameResultHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 12px;
+}
+
+.gameResultHeader strong {
+  color: #0f172a;
+  font-size: 18px;
+}
+
+.gameResultHeader p {
+  margin: 4px 0 0;
+  color: #64748b;
+  font-size: 13px;
+  line-height: 1.45;
+}
+
+.gameResultHeader span {
+  flex: 0 0 auto;
+  padding: 6px 10px;
+  border-radius: 999px;
+  background: #2563eb;
+  color: white;
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.gameResultList {
+  display: grid;
+  gap: 8px;
+}
+
+.gameResultItem {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  padding: 12px;
+  border: 1px solid #e2e8f0;
+  border-radius: 14px;
+  background: white;
+}
+
+.gameResultItem.winner {
+  border-color: #93c5fd;
+  background: #eff6ff;
+}
+
+.gameResultRank {
+  display: grid;
+  gap: 2px;
+}
+
+.gameResultRank strong {
+  color: #2563eb;
+  font-size: 15px;
+}
+
+.gameResultRank span {
+  color: #0f172a;
+  font-weight: 800;
+}
+
+.gameResultScore {
+  display: grid;
+  justify-items: end;
+  gap: 2px;
+}
+
+.gameResultScore strong {
+  color: #0f172a;
+  font-size: 16px;
+}
+
+.gameResultScore em {
+  font-style: normal;
+  font-weight: 900;
+}
+
+.gameResultScore em.positive {
+  color: #2563eb;
+}
+
+.gameResultScore em.negative {
+  color: #dc2626;
+}
+
+.gameResultSettlementNote {
+  padding: 12px;
+  border-radius: 14px;
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+}
+
+.gameResultSettlementNote strong {
+  color: #0f172a;
+  font-size: 14px;
+}
+
+.gameResultSettlementNote p {
+  margin: 4px 0 0;
+  color: #64748b;
+  font-size: 13px;
+  line-height: 1.45;
+}
