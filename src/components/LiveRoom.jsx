@@ -178,31 +178,6 @@ export default function LiveRoom({
         </div>
       )}
 
-      {hasBet && !isFinished && (
-        <div className="betSettlementBox">
-          <div className="betSettlementHeader">
-            <strong>현재 판 임시 정산</strong>
-            <span>{getBetRuleTitle(activeBetRule)}</span>
-          </div>
-          <p>현재 점수 기준 임시 정산입니다. 판 종료 후 저장해야 누적 정산에 반영됩니다.</p>
-
-          <div className="betSettlementList">
-            {currentSettlement.map((item) => (
-              <div className="betSettlementItem" key={item.userId}>
-                <div>
-                  <strong>{item.rank}등 {item.name}</strong>
-                  <span>
-                    {item.total}점 · 낼 돈 {Number(item.pay || 0).toLocaleString()}원 · 받을 돈 {Number(item.receive || 0).toLocaleString()}원
-                  </span>
-                </div>
-                <em className={item.net >= 0 ? "positive" : "negative"}>
-                  {formatMoney(item.net)}
-                </em>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
 
       {roomPlayers.length === 0 ? (
         <div className="empty">아직 참가자가 없습니다.</div>
