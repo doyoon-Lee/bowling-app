@@ -32,11 +32,13 @@ import { getCachedSupabaseClient, getSupabaseClient } from "./utils/supabaseClie
 const BOWLING_RECORD_CACHE_PREFIX = "bowling_records_cache_v1";
 const LIVE_ROOM_CACHE_PREFIX = "bowling_live_room_v1";
 const LIVE_ROOM_DRAFT_PREFIX = "bowling_live_score_draft_v1";
+const LIVE_ROOM_HISTORY_SYNC_PREFIX = "bowling_live_history_sync_v1";
 
 
 const getRecordCacheKey = (userId) => `${BOWLING_RECORD_CACHE_PREFIX}:${userId || "anonymous"}`;
 const getLiveRoomCacheKey = (userId) => `${LIVE_ROOM_CACHE_PREFIX}:${userId || "anonymous"}`;
 const getLiveRoomDraftKey = (roomId, userId) => `${LIVE_ROOM_DRAFT_PREFIX}:${roomId || "no-room"}:${userId || "anonymous"}`;
+const getLiveRoomHistorySyncKey = (roomResultId, userId) => `${LIVE_ROOM_HISTORY_SYNC_PREFIX}:${roomResultId || "no-result"}:${userId || "anonymous"}`;
 
 const getPlayerNameForRoom = (playerName, user) => playerName?.trim() || getDisplayUserName(user);
 
@@ -179,36 +181,89 @@ function MissingPlayersModal({ players, onClose }) {
   );
 }
 
-async function saveLiveRoomGameHistories(client, { roomCode, roundNumber, players, scores, place }) {
-  if (!client || !Array.isArray(scores) || scores.length === 0) return;
+function getLiveRoomHistoryPlace({ place, roomCode, roundNumber }) {
+  const basePlace = place?.trim() || `실시간 방 ${roomCode || ""}`.trim() || "실시간 방";
+  return `${basePlace} · ${Number(roundNumber || 1)}판`;
+}
 
-  const playersByUser = new Map((players || []).map((player) => [player.user_id, player]));
-  const historyRows = scores
-    .filter((score) => score?.user_id && Array.isArray(score?.rolls) && isCompleteGameRolls(score.rolls))
-    .map((score) => {
-      const player = playersByUser.get(score.user_id);
-      const playerName = score.player_name || player?.player_name || "게스트";
+function isSameRolls(left, right) {
+  return JSON.stringify(Array.isArray(left) ? left : []) === JSON.stringify(Array.isArray(right) ? right : []);
+}
 
-      return {
-        user_id: score.user_id,
-        user_email: `${score.user_id}@live-room.local`,
-        player_name: playerName,
-        place: place?.trim() || `실시간 방 ${roomCode || ""}`.trim(),
-        total: Number(score.total || 0),
-        rolls: Array.isArray(score.rolls) ? score.rolls : [],
-        frames: Array.isArray(score.frames) ? score.frames : [],
-      };
-    });
+async function syncLiveRoomRoundToMyHistory(client, { roomResult, roomCode, currentUser, place }) {
+  if (!client || !roomResult || !currentUser?.id) return null;
 
-  if (historyRows.length === 0) return;
+  const resultData = roomResult.result_data || {};
+  const scores = Array.isArray(resultData.scores) ? resultData.scores : [];
+  const players = Array.isArray(resultData.players) ? resultData.players : [];
+  const myScore = scores.find((score) => score?.user_id === currentUser.id);
+
+  if (!myScore || !Array.isArray(myScore.rolls) || !isCompleteGameRolls(myScore.rolls)) return null;
+
+  const syncKey = getLiveRoomHistorySyncKey(roomResult.id, currentUser.id);
+  try {
+    if (localStorage.getItem(syncKey) === "done") return null;
+  } catch (error) {
+    console.warn("Failed to read live room history sync key:", error);
+  }
+
+  const player = players.find((item) => item?.user_id === currentUser.id);
+  const roundNumber = Number(roomResult.round_number || 1);
+  const historyPlace = getLiveRoomHistoryPlace({ place, roomCode, roundNumber });
+  const payload = {
+    user_id: currentUser.id,
+    user_email: getUserEmail(currentUser) || currentUser.email || `${currentUser.id}@live-room.local`,
+    player_name: myScore.player_name || player?.player_name || getDisplayUserName(currentUser) || "게스트",
+    place: historyPlace,
+    total: Number(myScore.total || 0),
+    rolls: Array.isArray(myScore.rolls) ? myScore.rolls : [],
+    frames: Array.isArray(myScore.frames) ? myScore.frames : [],
+  };
+
+  const createdAt = roomResult.created_at ? new Date(roomResult.created_at) : new Date();
+  const dayStart = new Date(createdAt);
+  dayStart.setHours(0, 0, 0, 0);
+  const dayEnd = new Date(dayStart);
+  dayEnd.setDate(dayEnd.getDate() + 1);
+
+  const { data: existingRecords, error: existingError } = await client
+    .from("bowling_games")
+    .select("id, user_id, user_email, player_name, place, total, rolls, frames, created_at")
+    .eq("user_id", currentUser.id)
+    .eq("place", historyPlace)
+    .gte("created_at", dayStart.toISOString())
+    .lt("created_at", dayEnd.toISOString());
+
+  if (existingError) throw existingError;
+
+  const duplicate = (existingRecords || []).find((record) =>
+    Number(record.total || 0) === Number(payload.total || 0) && isSameRolls(record.rolls, payload.rolls)
+  );
+
+  if (duplicate) {
+    try {
+      localStorage.setItem(syncKey, "done");
+    } catch (error) {
+      console.warn("Failed to write live room history sync key:", error);
+    }
+    return duplicate;
+  }
 
   const { data, error } = await client
     .from("bowling_games")
-    .insert(historyRows)
-    .select("id, user_id, user_email, player_name, place, total, rolls, frames, created_at");
+    .insert(payload)
+    .select("id, user_id, user_email, player_name, place, total, rolls, frames, created_at")
+    .single();
 
   if (error) throw error;
-  return data || [];
+
+  try {
+    localStorage.setItem(syncKey, "done");
+  } catch (storageError) {
+    console.warn("Failed to write live room history sync key:", storageError);
+  }
+
+  return data || null;
 }
 
 const saveLiveRoomDraft = ({ roomId, userId, rolls, pinFrames, currentRound }) => {
@@ -627,6 +682,22 @@ const resetLocalRoomScoreForNextRound = ({ savedBy, roundNumber } = {}) => {
           },
           async (payload) => {
             await fetchRoomData();
+
+            try {
+              const savedHistoryRecord = await syncLiveRoomRoundToMyHistory(client, {
+                roomResult: payload?.new,
+                roomCode: payload?.new?.room_code || roomCode,
+                currentUser: user,
+                place,
+              });
+
+              if (mounted && savedHistoryRecord?.id) {
+                setRecords((prev) => mergeRecordsById([savedHistoryRecord], prev));
+              }
+            } catch (historyError) {
+              console.warn("Live room history sync failed:", historyError);
+            }
+
             resetLocalRoomScoreForNextRound({
               savedBy: payload?.new?.result_data?.savedBy,
               roundNumber: payload?.new?.round_number,
@@ -646,7 +717,7 @@ const resetLocalRoomScoreForNextRound = ({ savedBy, roundNumber } = {}) => {
       if (channel && cached) cached.removeChannel(channel);
       if (typeof pollingTimer !== "undefined") window.clearInterval(pollingTimer);
     };
-  }, [roomId, user?.id]);
+  }, [roomId, user, user?.id, roomCode, place]);
 
   useEffect(() => {
     if (appMode !== "room" || !roomId || !user?.id) return;
@@ -838,7 +909,7 @@ const handleFinishCurrentRound = async () => {
     const activeBetRule = ensureBetRule(roomBetRule, roomBetAmount);
     const settlement = calculateBetSettlement(activePlayers, activeScores, activeBetRule);
 
-    await saveRoomGameRound(client, {
+    const savedRoomResult = await saveRoomGameRound(client, {
       roomId,
       roomCode,
       roundNumber: nextRoundNumber,
@@ -850,17 +921,15 @@ const handleFinishCurrentRound = async () => {
     });
 
     try {
-      const savedHistoryRows = await saveLiveRoomGameHistories(client, {
+      const savedHistoryRecord = await syncLiveRoomRoundToMyHistory(client, {
+        roomResult: savedRoomResult,
         roomCode,
-        roundNumber: nextRoundNumber,
-        players: activePlayers,
-        scores: activeScores,
+        currentUser: user,
         place,
       });
 
-      const mySavedHistoryRows = (savedHistoryRows || []).filter((record) => record.user_id === user?.id);
-      if (mySavedHistoryRows.length > 0) {
-        setRecords((prev) => mergeRecordsById(mySavedHistoryRows, prev));
+      if (savedHistoryRecord?.id) {
+        setRecords((prev) => mergeRecordsById([savedHistoryRecord], prev));
       }
     } catch (historyError) {
       console.warn("Live room history sync failed:", historyError);
@@ -868,8 +937,8 @@ const handleFinishCurrentRound = async () => {
         variant: "warning",
         icon: "⚠️",
         badge: "개인 기록 확인 필요",
-        title: "방 결과는 저장됐지만 개인 기록 반영에 실패했어요",
-        message: "현재 판 결과는 내기방에는 저장됐습니다. 개인 날짜별 기록 저장은 네트워크 상태를 확인한 뒤 다시 시도해주세요.",
+        title: "방 결과는 저장됐지만 내 개인 기록 반영에 실패했어요",
+        message: "현재 판 결과는 내기방에는 저장됐습니다. 날짜별 기록 저장은 네트워크 상태를 확인한 뒤 다시 시도해주세요.",
       });
     }
 
