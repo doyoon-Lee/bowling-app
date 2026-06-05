@@ -181,9 +181,8 @@ function MissingPlayersModal({ players, onClose }) {
   );
 }
 
-function getLiveRoomHistoryPlace({ place, roomCode, roundNumber }) {
-  const basePlace = place?.trim() || `실시간 방 ${roomCode || ""}`.trim() || "실시간 방";
-  return `${basePlace} · ${Number(roundNumber || 1)}판`;
+function getLiveRoomHistoryPlace({ place, roomCode }) {
+  return place?.trim() || `실시간 방 ${roomCode || ""}`.trim() || "실시간 방";
 }
 
 function isSameRolls(left, right) {
@@ -208,8 +207,7 @@ async function syncLiveRoomRoundToMyHistory(client, { roomResult, roomCode, curr
   }
 
   const player = players.find((item) => item?.user_id === currentUser.id);
-  const roundNumber = Number(roomResult.round_number || 1);
-  const historyPlace = getLiveRoomHistoryPlace({ place, roomCode, roundNumber });
+  const historyPlace = getLiveRoomHistoryPlace({ place, roomCode });
   const payload = {
     user_id: currentUser.id,
     user_email: getUserEmail(currentUser) || currentUser.email || `${currentUser.id}@live-room.local`,
