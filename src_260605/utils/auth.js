@@ -76,6 +76,21 @@ export function isEmailLikeDisplayName(value, user) {
   return trimmed.includes("@") || trimmed === email || trimmed === emailLocalPart(user);
 }
 
+export function getUserEmail(user) {
+  const metadata = user?.user_metadata || {};
+  const identityEmail = Array.isArray(user?.identities)
+    ? user.identities.find((identity) => identity?.identity_data?.email)?.identity_data?.email
+    : "";
+
+  return (
+    user?.email ||
+    metadata.email ||
+    metadata.kakao_account?.email ||
+    identityEmail ||
+    "게스트 사용자"
+  );
+}
+
 export function isInAppBrowser() {
   const ua = navigator.userAgent.toLowerCase();
 

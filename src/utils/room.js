@@ -2,7 +2,7 @@ export function generateRoomCode() {
   return String(Math.floor(100000 + Math.random() * 900000));
 }
 
-export async function createRoom(client, { roomName, ownerId, playerName }) {
+export async function createRoom(client, { roomName, ownerId, playerName, betAmount = 0, betRule = null }) {
   const roomCode = generateRoomCode();
 
   const { data: room, error } = await client
@@ -11,6 +11,8 @@ export async function createRoom(client, { roomName, ownerId, playerName }) {
       room_code: roomCode,
       room_name: roomName || `${playerName || "사용자"}의 방`,
       owner_id: ownerId,
+      bet_amount: Math.max(0, Number(betAmount || 0)),
+      bet_rule: betRule,
     })
     .select("*")
     .single();

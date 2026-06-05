@@ -2080,6 +2080,65 @@ body {
 }
 
 
+.betRoomBox {
+  display: grid;
+  gap: 10px;
+  padding: 14px;
+  border: 1px solid #dbeafe;
+  border-radius: 16px;
+  background: #f8fbff;
+  margin-bottom: 12px;
+}
+
+.betRoomBox strong {
+  color: #0f172a;
+}
+
+.betRoomBox p,
+.betRoomBox small {
+  margin: 0;
+  color: #64748b;
+  font-size: 13px;
+  line-height: 1.45;
+}
+
+.betPresetGrid {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.betPresetGrid button {
+  border: 1px solid #bfdbfe;
+  border-radius: 12px;
+  background: white;
+  color: #2563eb;
+  font-weight: 700;
+  padding: 10px 6px;
+}
+
+.betPresetGrid button.active {
+  background: #2563eb;
+  color: white;
+}
+
+.betCustomInput {
+  display: grid;
+  grid-template-columns: 80px 1fr;
+  align-items: center;
+  gap: 8px;
+  color: #475569;
+  font-size: 13px;
+}
+
+.betCustomInput input {
+  width: 100%;
+  box-sizing: border-box;
+  border: 1px solid #cbd5e1;
+  border-radius: 12px;
+  padding: 10px 12px;
+}
+
 .roomCreateBox.singleAction {
   display: block;
 }
@@ -2087,3 +2146,252 @@ body {
 .roomCreateBox.singleAction button {
   width: 100%;
 }
+
+.betSettlementBox {
+  display: grid;
+  gap: 10px;
+  padding: 14px;
+  border: 1px solid #bfdbfe;
+  border-radius: 16px;
+  background: #eff6ff;
+  margin-bottom: 14px;
+}
+
+.betSettlementHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 10px;
+}
+
+.betSettlementHeader strong {
+  color: #0f172a;
+}
+
+.betSettlementHeader span,
+.betSettlementBox p {
+  color: #475569;
+  font-size: 13px;
+  margin: 0;
+}
+
+.betSettlementList {
+  display: grid;
+  gap: 8px;
+}
+
+.betSettlementItem {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+  border-radius: 12px;
+  background: white;
+}
+
+.betSettlementItem div {
+  display: grid;
+  gap: 2px;
+}
+
+.betSettlementItem strong {
+  color: #0f172a;
+  font-size: 14px;
+}
+
+.betSettlementItem span {
+  color: #64748b;
+  font-size: 12px;
+}
+
+.betSettlementItem em {
+  font-style: normal;
+  font-weight: 800;
+}
+
+.betSettlementItem em.positive {
+  color: #2563eb;
+}
+
+.betSettlementItem em.negative {
+  color: #dc2626;
+}
+
+@media (max-width: 640px) {
+  .betPresetGrid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+
+.betModalOverlay {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+  background: rgba(15, 23, 42, 0.45);
+}
+
+.betModal {
+  width: min(480px, 100%);
+  display: grid;
+  gap: 14px;
+  padding: 18px;
+  border-radius: 20px;
+  background: #ffffff;
+  box-shadow: 0 18px 50px rgba(15, 23, 42, 0.22);
+}
+
+.betModalHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 12px;
+}
+
+.betModalHeader strong {
+  color: #0f172a;
+  font-size: 18px;
+}
+
+.betModalHeader p {
+  margin: 4px 0 0;
+  color: #64748b;
+  font-size: 13px;
+  line-height: 1.45;
+}
+
+.betModalClose {
+  width: 34px;
+  height: 34px;
+  border: 0;
+  border-radius: 999px;
+  background: #f1f5f9;
+  color: #334155;
+  font-size: 22px;
+  line-height: 1;
+}
+
+.betRulePreview {
+  display: grid;
+  gap: 4px;
+  padding: 12px;
+  border-radius: 14px;
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+}
+
+.betRulePreview strong {
+  color: #0f172a;
+  font-size: 14px;
+}
+
+.betRulePreview p {
+  margin: 0;
+  color: #475569;
+  font-size: 13px;
+  line-height: 1.45;
+}
+
+.betModalActions {
+  display: grid;
+  grid-template-columns: 1fr 2fr;
+  gap: 8px;
+}
+
+.betModalActions button {
+  border: 0;
+  border-radius: 14px;
+  padding: 12px 10px;
+  font-weight: 800;
+  background: #2563eb;
+  color: white;
+}
+
+.betModalActions button.secondary {
+  background: #e2e8f0;
+  color: #334155;
+}
+
+
+.betModeGrid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.betModeGrid button {
+  border: 1px solid #bfdbfe;
+  border-radius: 14px;
+  background: white;
+  color: #2563eb;
+  font-weight: 800;
+  padding: 12px 8px;
+}
+
+.betModeGrid button.active {
+  background: #2563eb;
+  color: white;
+}
+
+.customRankRuleBox {
+  display: grid;
+  gap: 10px;
+  padding: 12px;
+  border: 1px solid #e2e8f0;
+  border-radius: 14px;
+  background: #f8fafc;
+}
+
+.customRankRuleBox strong {
+  color: #0f172a;
+}
+
+.customRankRuleBox p,
+.customRankRuleBox small {
+  margin: 0;
+  color: #64748b;
+  font-size: 13px;
+  line-height: 1.45;
+}
+
+.customRankRuleList {
+  display: grid;
+  gap: 8px;
+  max-height: 210px;
+  overflow: auto;
+}
+
+.customRankRuleItem {
+  display: grid;
+  grid-template-columns: 54px 1fr 24px;
+  align-items: center;
+  gap: 8px;
+}
+
+.customRankRuleItem span,
+.customRankRuleItem em {
+  color: #475569;
+  font-size: 13px;
+  font-style: normal;
+}
+
+.customRankRuleItem input {
+  width: 100%;
+  box-sizing: border-box;
+  border: 1px solid #cbd5e1;
+  border-radius: 12px;
+  padding: 10px 12px;
+}
+
+@media (max-width: 640px) {
+  .betModeGrid {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* Custom rank mode uses only rank amount inputs; preset amount buttons are intentionally hidden in JSX. */

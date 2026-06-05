@@ -39,6 +39,18 @@ export async function findRoomByCode(client, roomCode) {
   return room;
 }
 
+
+export async function findRoomById(client, roomId) {
+  const { data: room, error } = await client
+    .from("bowling_rooms")
+    .select("*")
+    .eq("id", roomId)
+    .single();
+
+  if (error) throw error;
+  return room;
+}
+
 export async function joinRoomById(client, { roomId, userId, playerName }) {
   const { error } = await client.from("bowling_room_players").upsert(
     {
@@ -63,7 +75,6 @@ export async function upsertRoomScore(client, { roomId, userId, playerName, roll
       rolls,
       frames,
       total,
-      updated_at: new Date().toISOString(),
     },
     { onConflict: "room_id,user_id" }
   );

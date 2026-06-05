@@ -24,6 +24,7 @@ import Scoreboard from "./components/Scoreboard";
 
 import { APP_LOGGED_OUT_KEY, createGuestName, getDisplayUserName, getUserEmail, isEmailLikeDisplayName, isGuestUser, isInAppBrowser, openCurrentPageInExternalBrowser } from "./utils/auth";
 import { createRoom, findRoomByCode, findRoomById, joinRoomById, upsertRoomScore } from "./utils/room";
+import { createBetRule } from "./utils/betting";
 import { groupRecordsByDate } from "./utils/date";
 import { getCachedSupabaseClient, getSupabaseClient } from "./utils/supabaseClient";
 
@@ -96,6 +97,8 @@ export default function App() {
   const [roomCode, setRoomCode] = useState("");
   const [roomPlayers, setRoomPlayers] = useState([]);
   const [roomScores, setRoomScores] = useState([]);
+  const [roomBetAmount, setRoomBetAmount] = useState(0);
+  const [roomBetRule, setRoomBetRule] = useState(null);
   const roomChannelRef = useRef(null);
   const liveRoomReadyRef = useRef(false);
 
@@ -171,6 +174,9 @@ export default function App() {
 
         setRoomId(room.id);
         setRoomCode(room.room_code || cachedRoom.roomCode || "");
+        setRoomBetAmount(Number(room.bet_amount || cachedRoom.betAmount || 0));
+        setRoomBetRule(room.bet_rule || cachedRoom.betRule || createBetRule({ mode: "none" }));
+        setRoomBetAmount(Number(room.bet_amount || cachedRoom.betAmount || 0));
         setAppMode("room");
       } catch (error) {
         console.warn("Cached live room restore failed:", error);
@@ -496,7 +502,7 @@ export default function App() {
     setPlayerName("");
   };
 
-  const handleCreateRoom = async () => {
+  const handleCreateRoom = async ({ betAmount = 0, betRule = null } = {}) => {
     const client = await getSupabaseClient();
     if (!client || !user) return;
 
@@ -505,17 +511,21 @@ export default function App() {
       const room = await createRoom(client, {
         ownerId: user.id,
         playerName: roomPlayerName,
+        betAmount,
+        betRule,
       });
 
       localStorage.setItem(
         getLiveRoomCacheKey(user.id),
-        JSON.stringify({ roomId: room.id, roomCode: room.room_code })
+        JSON.stringify({ roomId: room.id, roomCode: room.room_code, betAmount: Number(room.bet_amount || betAmount || 0), betRule: room.bet_rule || betRule })
       );
 
       setRoomPlayers([{ room_id: room.id, user_id: user.id, player_name: roomPlayerName }]);
       setRoomScores([]);
       setRoomId(room.id);
       setRoomCode(room.room_code);
+      setRoomBetAmount(Number(room.bet_amount || betAmount || 0));
+      setRoomBetRule(room.bet_rule || betRule || createBetRule({ mode: "none" }));
       setAppMode("room");
     } catch (error) {
       alert(`방 만들기 실패: ${error.message}`);
@@ -542,7 +552,7 @@ export default function App() {
 
       localStorage.setItem(
         getLiveRoomCacheKey(user.id),
-        JSON.stringify({ roomId: room.id, roomCode: room.room_code })
+        JSON.stringify({ roomId: room.id, roomCode: room.room_code, betAmount: Number(room.bet_amount || 0), betRule: room.bet_rule || createBetRule({ mode: 'none' }) })
       );
 
       setRoomPlayers((prev) => {
@@ -551,6 +561,8 @@ export default function App() {
       });
       setRoomId(room.id);
       setRoomCode(room.room_code);
+      setRoomBetAmount(Number(room.bet_amount || 0));
+      setRoomBetRule(room.bet_rule || createBetRule({ mode: "none" }));
       setAppMode("room");
     } catch (error) {
       alert(`방 참여 실패: ${error.message}`);
@@ -575,6 +587,8 @@ export default function App() {
     setRoomCode("");
     setRoomPlayers([]);
     setRoomScores([]);
+    setRoomBetAmount(0);
+    setRoomBetRule(null);
   };
 
   const searchNearbyBowlingPlaces = () => {
@@ -1305,6 +1319,8 @@ export default function App() {
             roomPlayers={roomPlayers}
             roomScores={roomScores}
             currentUserId={user.id}
+            betAmount={roomBetAmount}
+            betRule={roomBetRule}
           />
         )}
 

@@ -1,7 +1,6 @@
 import React, { useState } from "react";
 
 export default function RoomLobby({ appMode, roomCode, onCreateRoom, onJoinRoom, onLeaveRoom }) {
-  const [roomNameInput, setRoomNameInput] = useState("");
   const [joinCodeInput, setJoinCodeInput] = useState("");
 
   if (appMode === "room") {
@@ -23,13 +22,8 @@ export default function RoomLobby({ appMode, roomCode, onCreateRoom, onJoinRoom,
         <span>방을 만들거나 방 코드로 참여해 서로 점수판을 볼 수 있습니다.</span>
       </div>
 
-      <div className="roomCreateBox">
-        <input
-          value={roomNameInput}
-          onChange={(e) => setRoomNameInput(e.target.value)}
-          placeholder="방 이름 선택 입력"
-        />
-        <button type="button" onClick={() => onCreateRoom(roomNameInput)}>방 만들기</button>
+      <div className="roomCreateBox singleAction">
+        <button type="button" onClick={onCreateRoom}>방 만들기</button>
       </div>
 
       <div className="roomJoinBox">

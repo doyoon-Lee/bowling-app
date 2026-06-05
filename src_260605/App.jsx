@@ -22,14 +22,52 @@ import RoomLobby from "./components/RoomLobby";
 import ProMode from "./components/ProMode";
 import Scoreboard from "./components/Scoreboard";
 
-import { APP_LOGGED_OUT_KEY, createGuestName, getDisplayUserName, isEmailLikeDisplayName, isGuestUser, isInAppBrowser, openCurrentPageInExternalBrowser } from "./utils/auth";
-import {createRoom, findRoomByCode, joinRoomById, upsertRoomScore } from "./utils/room";
+import { APP_LOGGED_OUT_KEY, createGuestName, getDisplayUserName, getUserEmail, isEmailLikeDisplayName, isGuestUser, isInAppBrowser, openCurrentPageInExternalBrowser } from "./utils/auth";
+import { createRoom, findRoomByCode, findRoomById, joinRoomById, upsertRoomScore } from "./utils/room";
 import { groupRecordsByDate } from "./utils/date";
 import { getCachedSupabaseClient, getSupabaseClient } from "./utils/supabaseClient";
 
 const BOWLING_RECORD_CACHE_PREFIX = "bowling_records_cache_v1";
+const LIVE_ROOM_CACHE_PREFIX = "bowling_live_room_v1";
+const LIVE_ROOM_DRAFT_PREFIX = "bowling_live_score_draft_v1";
+
 
 const getRecordCacheKey = (userId) => `${BOWLING_RECORD_CACHE_PREFIX}:${userId || "anonymous"}`;
+const getLiveRoomCacheKey = (userId) => `${LIVE_ROOM_CACHE_PREFIX}:${userId || "anonymous"}`;
+const getLiveRoomDraftKey = (roomId, userId) => `${LIVE_ROOM_DRAFT_PREFIX}:${roomId || "no-room"}:${userId || "anonymous"}`;
+
+const getPlayerNameForRoom = (playerName, user) => playerName?.trim() || getDisplayUserName(user);
+
+const saveLiveRoomDraft = ({ roomId, userId, rolls, pinFrames }) => {
+  if (!roomId || !userId) return;
+
+  try {
+    localStorage.setItem(
+      getLiveRoomDraftKey(roomId, userId),
+      JSON.stringify({
+        rolls: Array.isArray(rolls) ? rolls : [],
+        pinFrames: Array.isArray(pinFrames) ? pinFrames : [],
+        savedAt: new Date().toISOString(),
+      })
+    );
+  } catch (error) {
+    console.warn("Failed to save live room draft:", error);
+  }
+};
+
+const readLiveRoomDraft = (roomId, userId) => {
+  if (!roomId || !userId) return null;
+
+  try {
+    const draft = JSON.parse(localStorage.getItem(getLiveRoomDraftKey(roomId, userId)) || "null");
+    if (!draft || !Array.isArray(draft.rolls)) return null;
+    return draft;
+  } catch (error) {
+    console.warn("Failed to read live room draft:", error);
+    return null;
+  }
+};
+
 
 const mergeRecordsById = (...recordGroups) => {
   const map = new Map();
@@ -59,6 +97,7 @@ export default function App() {
   const [roomPlayers, setRoomPlayers] = useState([]);
   const [roomScores, setRoomScores] = useState([]);
   const roomChannelRef = useRef(null);
+  const liveRoomReadyRef = useRef(false);
 
   const [playerName, setPlayerName] = useState("");
   const [place, setPlace] = useState("");
@@ -84,6 +123,7 @@ export default function App() {
   const [pinFrames, setPinFrames] = useState([]);
   const [records, setRecords] = useState([]);
   const [isSaving, setIsSaving] = useState(false);
+  const [liveSyncStatus, setLiveSyncStatus] = useState("");
 
   const scoreboardRef = useRef(null);
   const user = session?.user;
@@ -99,6 +139,51 @@ export default function App() {
       return currentName;
     });
   }, [user?.id, user?.email]);
+
+  useEffect(() => {
+    if (!user?.id) return;
+
+    let mounted = true;
+
+    async function restoreLiveRoom() {
+      let cachedRoom = null;
+
+      try {
+        cachedRoom = JSON.parse(localStorage.getItem(getLiveRoomCacheKey(user.id)) || "null");
+      } catch (error) {
+        console.warn("Failed to read cached live room:", error);
+      }
+
+      if (!cachedRoom?.roomId) return;
+
+      const client = await getSupabaseClient();
+      if (!client || !mounted) return;
+
+      try {
+        const room = await findRoomById(client, cachedRoom.roomId);
+        if (!room || !mounted) return;
+
+        await joinRoomById(client, {
+          roomId: room.id,
+          userId: user.id,
+          playerName: getPlayerNameForRoom(playerName, user),
+        });
+
+        setRoomId(room.id);
+        setRoomCode(room.room_code || cachedRoom.roomCode || "");
+        setAppMode("room");
+      } catch (error) {
+        console.warn("Cached live room restore failed:", error);
+        localStorage.removeItem(getLiveRoomCacheKey(user.id));
+      }
+    }
+
+    restoreLiveRoom();
+
+    return () => {
+      mounted = false;
+    };
+  }, [user?.id]);
 
   useEffect(() => {
     if (!user?.id) return;
@@ -211,6 +296,8 @@ export default function App() {
 
 
   useEffect(() => {
+    liveRoomReadyRef.current = false;
+
     if (!roomId) {
       setRoomPlayers([]);
       setRoomScores([]);
@@ -218,6 +305,7 @@ export default function App() {
     }
 
     let channel;
+    let pollingTimer;
     let mounted = true;
 
     async function subscribeRoom() {
@@ -244,6 +332,8 @@ export default function App() {
 
       await fetchRoomData();
 
+      pollingTimer = window.setInterval(fetchRoomData, 3000);
+
       channel = client
         .channel(`room-${roomId}`)
         .on(
@@ -267,6 +357,8 @@ export default function App() {
           fetchRoomData
         )
         .subscribe();
+
+      roomChannelRef.current = channel;
     }
 
     subscribeRoom();
@@ -275,8 +367,51 @@ export default function App() {
       mounted = false;
       const cached = getCachedSupabaseClient();
       if (channel && cached) cached.removeChannel(channel);
+      if (typeof pollingTimer !== "undefined") window.clearInterval(pollingTimer);
     };
   }, [roomId]);
+
+  useEffect(() => {
+    if (appMode !== "room" || !roomId || !user?.id) return;
+
+    let mounted = true;
+
+    async function restoreLiveRoomScore() {
+      try {
+        const draft = readLiveRoomDraft(roomId, user.id);
+
+        if (draft?.rolls?.length) {
+          setRolls(draft.rolls);
+          setPinFrames(Array.isArray(draft.pinFrames) ? draft.pinFrames : []);
+          return;
+        }
+
+        const client = await getSupabaseClient();
+        if (!client || !mounted) return;
+
+        const { data, error } = await client
+          .from("bowling_room_scores")
+          .select("rolls, frames")
+          .eq("room_id", roomId)
+          .eq("user_id", user.id)
+          .maybeSingle();
+
+        if (!mounted || error || !data) return;
+
+        if (Array.isArray(data.rolls) && data.rolls.length) {
+          setRolls(data.rolls);
+        }
+      } finally {
+        if (mounted) liveRoomReadyRef.current = true;
+      }
+    }
+
+    restoreLiveRoomScore();
+
+    return () => {
+      mounted = false;
+    };
+  }, [appMode, roomId, user?.id]);
 
   const signInWithProvider = async (provider) => {
     localStorage.removeItem(APP_LOGGED_OUT_KEY);
@@ -340,6 +475,11 @@ export default function App() {
     const client = await getSupabaseClient();
     if (!client) return;
 
+    if (user?.id) {
+      localStorage.removeItem(getLiveRoomCacheKey(user.id));
+      if (roomId) localStorage.removeItem(getLiveRoomDraftKey(roomId, user.id));
+    }
+
     if (isGuestUser(user)) {
       localStorage.setItem(APP_LOGGED_OUT_KEY, "true");
       setSession(null);
@@ -356,17 +496,24 @@ export default function App() {
     setPlayerName("");
   };
 
-  const handleCreateRoom = async (roomNameInput) => {
+  const handleCreateRoom = async () => {
     const client = await getSupabaseClient();
     if (!client || !user) return;
 
     try {
+      const roomPlayerName = getPlayerNameForRoom(playerName, user);
       const room = await createRoom(client, {
-        roomName: roomNameInput,
         ownerId: user.id,
-        playerName: playerName || getDisplayUserName(user),
+        playerName: roomPlayerName,
       });
 
+      localStorage.setItem(
+        getLiveRoomCacheKey(user.id),
+        JSON.stringify({ roomId: room.id, roomCode: room.room_code })
+      );
+
+      setRoomPlayers([{ room_id: room.id, user_id: user.id, player_name: roomPlayerName }]);
+      setRoomScores([]);
       setRoomId(room.id);
       setRoomCode(room.room_code);
       setAppMode("room");
@@ -386,12 +533,22 @@ export default function App() {
 
     try {
       const room = await findRoomByCode(client, joinCodeInput);
+      const roomPlayerName = getPlayerNameForRoom(playerName, user);
       await joinRoomById(client, {
         roomId: room.id,
         userId: user.id,
-        playerName: playerName || getDisplayUserName(user),
+        playerName: roomPlayerName,
       });
 
+      localStorage.setItem(
+        getLiveRoomCacheKey(user.id),
+        JSON.stringify({ roomId: room.id, roomCode: room.room_code })
+      );
+
+      setRoomPlayers((prev) => {
+        const others = prev.filter((player) => player.user_id !== user.id);
+        return [...others, { room_id: room.id, user_id: user.id, player_name: roomPlayerName }];
+      });
       setRoomId(room.id);
       setRoomCode(room.room_code);
       setAppMode("room");
@@ -406,6 +563,11 @@ export default function App() {
     if (client && roomChannelRef.current) {
       await client.removeChannel(roomChannelRef.current);
       roomChannelRef.current = null;
+    }
+
+    if (user?.id) {
+      localStorage.removeItem(getLiveRoomCacheKey(user.id));
+      if (roomId) localStorage.removeItem(getLiveRoomDraftKey(roomId, user.id));
     }
 
     setAppMode("solo");
@@ -830,34 +992,82 @@ export default function App() {
   const syncRoomScoreLive = async (nextRolls) => {
     if (appMode !== "room" || !roomId || !user) return;
 
-    const client = await getSupabaseClient();
-    if (!client) return;
-
     const nextResult = calcBowlingScore(nextRolls);
+    const roomPlayerName = getPlayerNameForRoom(playerName, user);
+
+    saveLiveRoomDraft({
+      roomId,
+      userId: user.id,
+      rolls: nextRolls,
+      pinFrames,
+    });
+
     const optimisticScore = {
       room_id: roomId,
       user_id: user.id,
-      player_name: playerName.trim() || getDisplayUserName(user),
+      player_name: roomPlayerName,
       total: nextResult.total,
       rolls: nextRolls,
       frames: nextResult.frames,
       updated_at: new Date().toISOString(),
     };
 
+    setLiveSyncStatus("자동 저장 중...");
     setRoomScores((prev) => {
       const others = prev.filter((score) => score.user_id !== user.id);
       return [optimisticScore, ...others];
     });
 
-    await client.from("bowling_room_scores").upsert(optimisticScore, {
-      onConflict: "room_id,user_id",
-    });
+    const client = await getSupabaseClient();
+    if (!client) {
+      setLiveSyncStatus("로컬 임시저장됨");
+      return;
+    }
+
+    try {
+      await upsertRoomScore(client, {
+        roomId,
+        userId: user.id,
+        playerName: roomPlayerName,
+        rolls: nextRolls,
+        frames: nextResult.frames,
+        total: nextResult.total,
+      });
+      setLiveSyncStatus("자동 저장됨");
+    } catch (error) {
+      console.error("Live room score sync failed:", error);
+      setLiveSyncStatus("동기화 실패 - 로컬 보관됨");
+    }
   };
 
   useEffect(() => {
     if (appMode !== "room" || !roomId || !user) return;
+
+    async function syncRoomPlayerName() {
+      const client = await getSupabaseClient();
+      if (!client) return;
+
+      const roomPlayerName = getPlayerNameForRoom(playerName, user);
+      await joinRoomById(client, {
+        roomId,
+        userId: user.id,
+        playerName: roomPlayerName,
+      });
+
+      setRoomPlayers((prev) => {
+        const others = prev.filter((player) => player.user_id !== user.id);
+        return [...others, { room_id: roomId, user_id: user.id, player_name: roomPlayerName }];
+      });
+    }
+
+    syncRoomPlayerName();
+  }, [playerName, appMode, roomId, user?.id]);
+
+  useEffect(() => {
+    if (appMode !== "room" || !roomId || !user) return;
+    if (!liveRoomReadyRef.current) return;
     syncRoomScoreLive(rolls);
-  }, [rolls, appMode, roomId, user?.id]);
+  }, [rolls, pinFrames, playerName, appMode, roomId, user?.id]);
 
   const addRoll = (pins) => {
     if (!next || pins > next.max) return;
@@ -971,7 +1181,7 @@ export default function App() {
         <header className="header compactHeader">
           <div>
             <h1>🎳 Bowling Score</h1>
-            <p>{getDisplayUserName(user)}</p>
+            <p>{getUserEmail(user)}</p>
           </div>
           <div className="headerActions">
             <button className="logoutButton" onClick={signOut}>
@@ -1052,6 +1262,10 @@ export default function App() {
               {isSaving ? "저장 중" : "저장"}
             </button>
           </div>
+
+          {appMode === "room" && liveSyncStatus && (
+            <p className="liveSyncStatus">{liveSyncStatus}</p>
+          )}
         </section>
 
         {isCameraModalOpen && (
