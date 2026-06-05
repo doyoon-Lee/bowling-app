@@ -92,6 +92,71 @@ function FinalSettlementModal({ settlement, onClose }) {
   );
 }
 
+
+function MissingPlayersModal({ players, onClose }) {
+  const missingPlayers = Array.isArray(players) ? players : [];
+  if (missingPlayers.length === 0) return null;
+
+  return (
+    <div className="modalBackdrop missingPlayersBackdrop" role="presentation" onClick={onClose}>
+      <section
+        className="missingPlayersModal"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="missingPlayersTitle"
+        onClick={(event) => event.stopPropagation()}
+      >
+        <div className="missingPlayersIcon">🎳</div>
+        <div className="missingPlayersHeader">
+          <span>아직 저장 전이에요</span>
+          <h2 id="missingPlayersTitle">점수 입력이 필요한 플레이어가 있어요</h2>
+          <p>모든 플레이어가 10프레임까지 입력해야 현재 판을 저장하고 다음 판으로 넘어갈 수 있습니다.</p>
+        </div>
+
+        <div className="missingPlayersList">
+          {missingPlayers.map((player) => (
+            <div className="missingPlayersItem" key={player.user_id || player.player_name}>
+              <span>대기</span>
+              <strong>{player.player_name || "플레이어"}</strong>
+            </div>
+          ))}
+        </div>
+
+        <button type="button" className="missingPlayersConfirm" onClick={onClose}>
+          확인했어요
+        </button>
+      </section>
+    </div>
+  );
+}
+
+async function saveLiveRoomGameHistories(client, { roomCode, roundNumber, players, scores, place }) {
+  if (!client || !Array.isArray(scores) || scores.length === 0) return;
+
+  const playersByUser = new Map((players || []).map((player) => [player.user_id, player]));
+  const historyRows = scores
+    .filter((score) => score?.user_id && Array.isArray(score?.rolls) && isCompleteGameRolls(score.rolls))
+    .map((score) => {
+      const player = playersByUser.get(score.user_id);
+      const playerName = score.player_name || player?.player_name || "게스트";
+
+      return {
+        user_id: score.user_id,
+        user_email: `${score.user_id}@live-room.local`,
+        player_name: playerName,
+        place: place?.trim() || `실시간 방 ${roomCode || ""}`.trim(),
+        total: Number(score.total || 0),
+        rolls: Array.isArray(score.rolls) ? score.rolls : [],
+        frames: Array.isArray(score.frames) ? score.frames : [],
+      };
+    });
+
+  if (historyRows.length === 0) return;
+
+  const { error } = await client.from("bowling_games").insert(historyRows);
+  if (error) throw error;
+}
+
 const saveLiveRoomDraft = ({ roomId, userId, rolls, pinFrames, currentRound }) => {
   if (!roomId || !userId) return;
 
@@ -155,6 +220,7 @@ export default function App() {
   const [roomBetAmount, setRoomBetAmount] = useState(0);
   const [roomBetRule, setRoomBetRule] = useState(null);
   const [finalSettlement, setFinalSettlement] = useState(null);
+  const [missingPlayersNotice, setMissingPlayersNotice] = useState([]);
   const roomChannelRef = useRef(null);
   const liveRoomReadyRef = useRef(false);
 
@@ -687,7 +753,7 @@ const handleFinishCurrentRound = async () => {
     });
 
     if (incompletePlayers.length > 0) {
-      alert(`아직 10프레임까지 기록이 완료되지 않은 플레이어가 있습니다.\n${incompletePlayers.map((player) => `- ${player.player_name}`).join("\n")}`);
+      setMissingPlayersNotice(incompletePlayers);
       return;
     }
 
@@ -704,6 +770,18 @@ const handleFinishCurrentRound = async () => {
       betRule: activeBetRule,
       settlement,
     });
+
+    try {
+      await saveLiveRoomGameHistories(client, {
+        roomCode,
+        roundNumber: nextRoundNumber,
+        players: activePlayers,
+        scores: activeScores,
+        place,
+      });
+    } catch (historyError) {
+      console.warn("Live room history sync failed:", historyError);
+    }
 
     await clearRoomScores(client, roomId);
     if (user?.id) localStorage.removeItem(getLiveRoomDraftKey(roomId, user.id));
@@ -1418,7 +1496,7 @@ const handleFinalSettlement = async () => {
       });
 
       if (incompletePlayers.length > 0) {
-        alert(`아직 기록이 필요한 플레이어가 있습니다.\n${incompletePlayers.map((player) => `- ${player.player_name}`).join("\n")}`);
+        setMissingPlayersNotice(incompletePlayers);
         return;
       }
 
@@ -1637,6 +1715,13 @@ const handleFinalSettlement = async () => {
             placeCandidates={placeCandidates}
             onSelect={selectBowlingPlace}
             onClose={() => setIsPlaceModalOpen(false)}
+          />
+        )}
+
+        {missingPlayersNotice.length > 0 && (
+          <MissingPlayersModal
+            players={missingPlayersNotice}
+            onClose={() => setMissingPlayersNotice([])}
           />
         )}
 
