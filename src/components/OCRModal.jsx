@@ -25,7 +25,7 @@ export default function OCRModal({
 
   return (
     <div className="placeModalBackdrop" onClick={onClose}>
-      <div className="placeModal" onClick={(e) => e.stopPropagation()}>
+      <div className="placeModal ocrPhotoModal" onClick={(e) => e.stopPropagation()}>
         <div className="placeModalHeader">
           <div>
             <strong>점수판 사진 분석</strong>

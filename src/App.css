@@ -3638,3 +3638,52 @@ body {
     max-height: 300px;
   }
 }
+
+/* OCR photo selection: use the available modal width so mobile photos do not sit
+   inside a narrow preview with unused dark side space. The actual crop math still
+   uses the rendered image bounds. */
+.ocrPhotoModal {
+  max-width: min(760px, calc(100vw - 18px));
+  padding: 14px;
+}
+
+.ocrPhotoModal .cropImageWrap {
+  width: 100%;
+  background: transparent;
+  border: none;
+  border-radius: 18px;
+  overflow: visible;
+}
+
+.ocrPhotoModal .cropImageStage {
+  width: 100%;
+  display: block;
+  background: #0f172a;
+  border-radius: 18px;
+  overflow: hidden;
+}
+
+.ocrPhotoModal .cropImageStage .scoreImagePreview {
+  width: 100%;
+  height: auto;
+  max-width: none;
+  max-height: none;
+  object-fit: fill;
+  background: #0f172a;
+}
+
+@media (max-width: 520px) {
+  .placeModalBackdrop {
+    padding: 8px;
+  }
+
+  .ocrPhotoModal {
+    max-width: calc(100vw - 16px);
+    padding: 10px;
+    border-radius: 22px;
+  }
+
+  .ocrPhotoModal .cropImageStage {
+    border-radius: 16px;
+  }
+}
