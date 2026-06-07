@@ -1,4 +1,5 @@
-const TESSERACT_WHITELIST = "0123456789Xx/\u2215\\|-IlOoSsBb";
+const TESSERACT_MARK_WHITELIST = "0123456789Xx/\u2215\\|-IlOoSsBb";
+const TESSERACT_SCORE_WHITELIST = "0123456789 ";
 
 let workerPromise = null;
 let tesseractAvailable = null;
@@ -43,11 +44,6 @@ async function getTesseractWorker() {
           logger: () => {},
         });
 
-        await worker.setParameters({
-          tessedit_char_whitelist: TESSERACT_WHITELIST,
-          preserve_interword_spaces: "0",
-        });
-
         tesseractAvailable = true;
         return worker;
       } catch (error) {
@@ -61,11 +57,20 @@ async function getTesseractWorker() {
   return workerPromise;
 }
 
+async function setWorkerWhitelist(worker, whitelist) {
+  if (!worker) return;
+  await worker.setParameters({
+    tessedit_char_whitelist: whitelist,
+    preserve_interword_spaces: "1",
+  });
+}
+
 async function recognizeFrame(file, frameNo) {
   const worker = await getTesseractWorker();
   if (!worker || !file) return null;
 
   try {
+    await setWorkerWhitelist(worker, TESSERACT_MARK_WHITELIST);
     const result = await worker.recognize(file);
     const text = result?.data?.text || "";
     const confidence = Number(result?.data?.confidence ?? 0);
@@ -81,6 +86,63 @@ async function recognizeFrame(file, frameNo) {
   } catch (error) {
     console.warn(`Tesseract OCR failed at frame ${frameNo}:`, error);
     return null;
+  }
+}
+
+function extractScoreCandidates(text = "") {
+  return String(text)
+    .match(/\d{1,3}/g)
+    ?.map((value) => Number(value))
+    .filter((value) => Number.isFinite(value) && value >= 0 && value <= 300) || [];
+}
+
+function isLikelyCumulativeSequence(values = []) {
+  if (values.length < 2) return false;
+  for (let index = 1; index < values.length; index += 1) {
+    if (values[index] < values[index - 1]) return false;
+  }
+  return true;
+}
+
+function findBestCumulativeSequence(values = []) {
+  const candidates = values.filter((value) => value >= 0 && value <= 300);
+  if (candidates.length <= 10 && isLikelyCumulativeSequence(candidates)) return candidates;
+
+  let best = [];
+
+  function walk(startIndex, sequence) {
+    if (sequence.length > best.length) best = sequence;
+    if (best.length >= 10) return;
+
+    for (let index = startIndex; index < candidates.length; index += 1) {
+      const value = candidates[index];
+      const last = sequence[sequence.length - 1];
+      if (last !== undefined && value < last) continue;
+      if (value <= 10 && sequence.length > 0) continue;
+      walk(index + 1, [...sequence, value]);
+    }
+  }
+
+  walk(0, []);
+  return best.slice(-10);
+}
+
+export async function analyzeCumulativeScoresWithTesseract(rowFile) {
+  const worker = await getTesseractWorker();
+  if (!worker || !rowFile) return { scores: [], rawText: "", confidence: 0 };
+
+  try {
+    await setWorkerWhitelist(worker, TESSERACT_SCORE_WHITELIST);
+    const result = await worker.recognize(rowFile);
+    const rawText = result?.data?.text || "";
+    const confidence = Number(result?.data?.confidence ?? 0);
+    const candidates = extractScoreCandidates(rawText);
+    const scores = findBestCumulativeSequence(candidates);
+
+    return { scores, rawText, confidence, source: "tesseract_cumulative" };
+  } catch (error) {
+    console.warn("Tesseract cumulative score OCR failed:", error);
+    return { scores: [], rawText: "", confidence: 0 };
   }
 }
 

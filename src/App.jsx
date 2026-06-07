@@ -27,10 +27,10 @@ import { createBetRule, calculateBetSettlement, summarizeBetSettlement, ensureBe
 import { groupRecordsByDate } from "./utils/date";
 import { canvasToImageFile, preprocessScoreCanvas } from "./utils/imagePreprocess";
 import { cropCanvasByBox, detectScoreFrameBoxes } from "./utils/frameDetection";
-import { analyzeFramesWithTesseract } from "./utils/tesseractOcr";
-import { getOcrMergeSummary, mergeGeminiAndTesseractFrames } from "./utils/ocrMerge";
+import { analyzeCumulativeScoresWithTesseract } from "./utils/tesseractOcr";
 import { buildOcrReviewFrames, getOcrReviewSummary } from "./utils/ocrReview";
-import { buildGeminiBowlingOcrPrompt } from "./utils/ocr/geminiPrompt";
+import { buildAdvancedOcrResult, getOcrFailureGuide } from "./utils/ocrAccuracy";
+import { buildGeminiBowlingOcrPrompt, buildGeminiBowlingResponseSchema } from "./utils/ocr/geminiPrompt";
 import { getCachedSupabaseClient, getSupabaseClient } from "./utils/supabaseClient";
 
 const BOWLING_RECORD_CACHE_PREFIX = "bowling_records_cache_v1";
@@ -1517,7 +1517,7 @@ const handleFinalSettlement = async () => {
     try {
       const imageForAnalysis = await createCroppedScoreImageFile();
       const frameImages = await createFrameBasedScoreImages();
-      const tesseractFrames = frameImages.length === 10 ? await analyzeFramesWithTesseract(frameImages) : [];
+      const tesseractCumulativeResult = await analyzeCumulativeScoresWithTesseract(imageForAnalysis);
       const maxAttempts = 3;
       let bestResult = null;
       let previousResultForRetry =
@@ -1535,11 +1535,11 @@ const handleFinalSettlement = async () => {
         const formData = new FormData();
         formData.append("image", imageForAnalysis);
         formData.append("is_cropped_score_row", cropBox ? "true" : "false");
-        formData.append("ocr_mode", frameImages.length === 10 ? "frame_based" : "single_image");
+        formData.append("ocr_mode", frameImages.length === 10 ? "hybrid_row_and_frame" : "single_image");
         formData.append("frame_count", String(frameImages.length));
-        formData.append("preprocess_applied", "grayscale_contrast_sharpen_frame_boundary_detection_tesseract_compare_auto_retry");
+        formData.append("preprocess_applied", "grayscale_contrast_sharpen_frame_boundary_detection_row_frame_merge_tesseract_cumulative_auto_retry");
         formData.append("frame_detection", frameImages[0]?.detectionMethod || "none");
-        formData.append("prompt_version", "bowling-ocr-v7-auto-retry");
+        formData.append("prompt_version", "bowling-ocr-v8-advanced-accuracy");
         formData.append(
           "analysis_prompt",
           buildGeminiBowlingOcrPrompt({
@@ -1548,8 +1548,10 @@ const handleFinalSettlement = async () => {
           })
         );
 
-        if (tesseractFrames.length > 0) {
-          formData.append("tesseract_result_json", JSON.stringify(tesseractFrames));
+        formData.append("response_schema_json", JSON.stringify(buildGeminiBowlingResponseSchema()));
+
+        if (tesseractCumulativeResult?.scores?.length > 0) {
+          formData.append("tesseract_cumulative_json", JSON.stringify(tesseractCumulativeResult));
         }
 
         frameImages.forEach(({ frame, file }) => {
@@ -1619,37 +1621,31 @@ const handleFinalSettlement = async () => {
         }
 
         const cumulativeScores = getCumulativeScoresFromData(data);
-        const mergedOcrFrames = mergeGeminiAndTesseractFrames(data.frames, tesseractFrames);
-        const framesForRepair = mergedOcrFrames.length > 0 ? mergedOcrFrames : data.frames;
-        const frameBasedRolls = normalizeGeminiRollsFromFrames(framesForRepair, data.rolls);
-        const scoreCheckedRolls = repairGeminiFramesByCumulativeScores(
-          framesForRepair,
-          frameBasedRolls,
-          cumulativeScores
-        );
-        const repairedRolls = repairTenthFrameRolls(
-          scoreCheckedRolls,
-          framesForRepair,
-          data.finalScore,
-          cumulativeScores
-        );
-        const previewFrames = calcBowlingScore(repairedRolls).frames;
+        const advancedResult = buildAdvancedOcrResult({
+          data: { ...data, cumulativeScores },
+          tesseractCumulativeScores: tesseractCumulativeResult?.scores || [],
+          fallbackRolls: data.rolls,
+        });
+        const framesForRepair = Array.isArray(data.frames) ? data.frames : [];
+        const repairedRolls = advancedResult.repairedRolls;
+        const previewFrames = advancedResult.previewFrames;
         const reviewFrames = buildOcrReviewFrames({
           frames: framesForRepair,
           rolls: repairedRolls,
           framePreviews: ocrFramePreviews,
-          cumulativeScores,
-          finalScore: data.finalScore,
+          cumulativeScores: advancedResult.cumulativeScores,
+          finalScore: advancedResult.finalScore,
         });
-        const needsRetry = hasBlockingOcrIssue(reviewFrames);
+        const needsRetry = advancedResult.needsRetry || hasBlockingOcrIssue(reviewFrames);
 
         bestResult = {
           repairedRolls,
           previewFrames,
           reviewFrames,
           framesForRepair,
-          data,
+          data: { ...data, cumulativeScores: advancedResult.cumulativeScores, finalScore: advancedResult.finalScore },
           needsRetry,
+          advancedResult,
         };
 
         if (!needsRetry || attempt === maxAttempts) {
@@ -1659,8 +1655,8 @@ const handleFinalSettlement = async () => {
         previousResultForRetry = {
           rolls: repairedRolls,
           frames: previewFrames,
-          cumulativeScores,
-          finalScore: data.finalScore,
+          cumulativeScores: advancedResult.cumulativeScores,
+          finalScore: advancedResult.finalScore,
           review: reviewFrames.filter((frame) => frame.needsReview),
           note: "자동 검산에서 불일치가 감지되어 재분석합니다. 누적점수와 finalScore를 우선하여 다시 판단하세요.",
         };
@@ -1674,9 +1670,9 @@ const handleFinalSettlement = async () => {
       setOcrPreviewRolls(bestResult.repairedRolls);
       setGeminiPreviewFrames(bestResult.previewFrames);
       setOcrReviewFrames(bestResult.reviewFrames);
-      setOcrRawText(`${getOcrMergeSummary(bestResult.framesForRepair)} ${getOcrReviewSummary(bestResult.reviewFrames)} ${bestResult.data.notes || `confidence: ${bestResult.data.confidence ?? "정보 없음"}`}`);
+      setOcrRawText(`한 줄 전체 분석과 프레임 분석을 병합했습니다. ${getOcrReviewSummary(bestResult.reviewFrames)} ${bestResult.data.notes || `confidence: ${bestResult.data.confidence ?? "정보 없음"}`}`);
       setAnalysisAttempt((prev) => prev + 1);
-      setCameraMessage(bestResult.needsRetry ? "자동 검산을 완료했습니다. 결과가 다르면 사진을 다시 촬영해 분석해주세요." : "사진 분석과 자동 검산이 완료되었습니다.");
+      setCameraMessage(bestResult.needsRetry ? getOcrFailureGuide(bestResult.advancedResult) : "사진 분석과 자동 검산이 완료되었습니다.");
     } catch (error) {
       console.error("Gemini Analyze Error:", error);
       setCameraMessage(`사진 분석 중 오류 발생: ${error?.message || "알 수 없는 오류"}`);

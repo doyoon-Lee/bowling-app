@@ -95,3 +95,29 @@ previous_result_json이 존재하면 이전 분석 결과가 틀렸을 가능성
   "notes": "10프레임 재검토"
 }`;
 }
+
+export function buildGeminiBowlingResponseSchema() {
+  return {
+    type: "object",
+    properties: {
+      frames: {
+        type: "array",
+        items: {
+          type: "object",
+          properties: {
+            frame: { type: "integer" },
+            rolls: { type: "array", items: { type: "string" } },
+            mark: { type: "string" },
+            confidence: { type: "number" },
+          },
+          required: ["frame", "rolls", "confidence"],
+        },
+      },
+      cumulativeScores: { type: "array", items: { type: "integer" } },
+      finalScore: { type: "integer" },
+      confidence: { type: "number" },
+      notes: { type: "string" },
+    },
+    required: ["frames", "cumulativeScores", "finalScore"],
+  };
+}
