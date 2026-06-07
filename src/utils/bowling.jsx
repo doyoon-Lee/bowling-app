@@ -240,84 +240,149 @@ export function isTenthFrameGutterSpareAvailable(next, rolls) {
   return firstRoll === 10 && secondRoll === 0;
 }
 
-export function parseGeminiFrameRolls(frame) {
-  const frameNo = Number(frame?.frame);
-
-  const mark = String(frame?.mark || "")
+function normalizeOcrMarkText(value) {
+  return String(value || "")
     .toUpperCase()
     .replace(/[×✕＊*]/g, "X")
-    .replace(/[／]/g, "/")
+    .replace(/[／\\]/g, "/")
     .replace(/[–—_]/g, "-")
+    .replace(/[OoQ]/g, "0")
+    .replace(/[IiLl!]/g, "1")
+    .replace(/[Ss]/g, "5")
+    .replace(/[Bb]/g, "8")
     .replace(/\s+/g, "")
     .trim();
+}
 
-  const fallback = Array.isArray(frame?.rolls)
+function getCleanFallbackRolls(frame) {
+  return Array.isArray(frame?.rolls)
     ? frame.rolls
         .map((roll) => Number(roll))
         .filter((roll) => Number.isInteger(roll) && roll >= 0 && roll <= 10)
     : [];
+}
 
-  if (!frameNo || !mark) return fallback;
+function tokenToPins(token) {
+  if (token === "-") return 0;
+  if (/^[0-9]$/.test(token)) return Number(token);
+  return null;
+}
 
-  if (frameNo < 10) {
-    if (mark.includes("X")) return [10];
+function repairNormalFrameRolls(tokens, fallback = []) {
+  const firstToken = tokens[0];
+  const secondToken = tokens[1];
 
-    if (mark.includes("/")) {
-      const firstToken = mark.match(/[0-9-]/)?.[0];
-      const first = firstToken === "-" ? 0 : Number(firstToken);
+  if (firstToken === "X") return [10];
 
-      if (Number.isInteger(first) && first >= 0 && first <= 9) {
-        return [first, 10 - first];
-      }
+  const first = tokenToPins(firstToken);
+
+  if (Number.isInteger(first) && first >= 0 && first <= 9) {
+    if (secondToken === "/" || secondToken === "X") return [first, 10 - first];
+
+    const second = tokenToPins(secondToken);
+
+    if (Number.isInteger(second) && second >= 0) {
+      if (first + second <= 10) return [first, second];
+
+      // OCR에서 스페어(/)를 X, 8, 9 등으로 오인해 합계가 10을 넘는 경우 보정
+      return [first, 10 - first];
     }
 
-    const digits = mark.match(/[0-9-]/g) || [];
-
-    if (digits.length >= 2) {
-      const first = digits[0] === "-" ? 0 : Number(digits[0]);
-      const second = digits[1] === "-" ? 0 : Number(digits[1]);
-
-      if (
-        Number.isInteger(first) &&
-        Number.isInteger(second) &&
-        first >= 0 &&
-        second >= 0 &&
-        first + second <= 10
-      ) {
-        return [first, second];
-      }
+    if (fallback.length >= 2) {
+      const [fallbackFirst, fallbackSecond] = fallback;
+      if (fallbackFirst === first && fallbackFirst + fallbackSecond <= 10) return [fallbackFirst, fallbackSecond];
+      if (fallbackFirst === first && fallbackFirst + fallbackSecond > 10) return [first, 10 - first];
     }
-
-    return fallback;
   }
 
-  const tokens = mark.match(/X|\/|[0-9-]/g) || [];
+  if (fallback.length === 1 && fallback[0] === 10) return [10];
+
+  if (fallback.length >= 2) {
+    const [a, b] = fallback;
+    if (a === 10) return [10];
+    if (a >= 0 && a <= 9 && b >= 0) return a + b <= 10 ? [a, b] : [a, 10 - a];
+  }
+
+  return [];
+}
+
+function repairTenthFrameTokens(tokens, fallback = []) {
   const rolls = [];
 
-  tokens.forEach((token) => {
+  tokens.slice(0, 3).forEach((token, index) => {
     if (token === "X") {
-      rolls.push(10);
-      return;
-    }
+      if (index === 1 && rolls[0] !== 10) {
+        rolls.push(10 - rolls[0]);
+        return;
+      }
 
-    if (token === "-") {
-      rolls.push(0);
+      if (index === 2 && rolls[0] !== 10 && rolls[0] + rolls[1] < 10) return;
+
+      rolls.push(10);
       return;
     }
 
     if (token === "/") {
       const prev = rolls[rolls.length - 1];
-      if (Number.isInteger(prev)) rolls.push(10 - prev);
+      if (Number.isInteger(prev) && prev >= 0 && prev <= 9) rolls.push(10 - prev);
       return;
     }
 
-    const value = Number(token);
-    if (Number.isInteger(value) && value >= 0 && value <= 10) {
-      rolls.push(value);
+    const value = tokenToPins(token);
+    if (!Number.isInteger(value)) return;
+
+    if (index === 1 && rolls[0] !== 10 && rolls[0] + value > 10) {
+      rolls.push(10 - rolls[0]);
+      return;
     }
+
+    if (index === 2) {
+      const bonusEarned = rolls[0] === 10 || rolls[0] + rolls[1] === 10;
+      if (!bonusEarned) return;
+
+      if (rolls[0] === 10 && rolls[1] !== 10 && rolls[1] + value > 10) {
+        rolls.push(10 - rolls[1]);
+        return;
+      }
+    }
+
+    rolls.push(value);
   });
 
-  return rolls.length > 0 ? rolls.slice(0, 3) : fallback.slice(0, 3);
+  if (rolls.length > 0) return rolls.slice(0, 3);
+
+  const cleanFallback = fallback.slice(0, 3);
+  if (cleanFallback.length <= 1) return cleanFallback;
+
+  if (cleanFallback[0] !== 10 && cleanFallback[0] + cleanFallback[1] > 10) {
+    cleanFallback[1] = 10 - cleanFallback[0];
+  }
+
+  if (cleanFallback.length >= 3) {
+    const bonusEarned = cleanFallback[0] === 10 || cleanFallback[0] + cleanFallback[1] === 10;
+    if (!bonusEarned) return cleanFallback.slice(0, 2);
+
+    if (cleanFallback[0] === 10 && cleanFallback[1] !== 10 && cleanFallback[1] + cleanFallback[2] > 10) {
+      cleanFallback[2] = 10 - cleanFallback[1];
+    }
+  }
+
+  return cleanFallback;
+}
+
+export function parseGeminiFrameRolls(frame) {
+  const frameNo = Number(frame?.frame);
+  const mark = normalizeOcrMarkText(frame?.mark);
+  const fallback = getCleanFallbackRolls(frame);
+
+  if (!frameNo || !mark) return fallback;
+
+  const tokens = mark.match(/X|\/|[0-9-]/g) || [];
+  if (tokens.length === 0) return fallback;
+
+  if (frameNo < 10) return repairNormalFrameRolls(tokens, fallback);
+
+  return repairTenthFrameTokens(tokens, fallback);
 }
 
 export 
