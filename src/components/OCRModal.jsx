@@ -115,7 +115,7 @@ export default function OCRModal({
 
         {ocrPreviewRolls.length > 0 && (
           <div className="ocrPreviewBox">
-            <strong>Gemini 분석 투구값</strong>
+            <strong>혼합 OCR 분석 투구값</strong>
             <div className="geminiScoreboardPreview">
               {previewFrames.map((frame) => (
                 <div className="geminiScoreFrame" key={frame.frame}>
@@ -162,7 +162,7 @@ export default function OCRModal({
         )}
 
         <p className="cameraGuide">
-          Gemini Vision으로 사진을 분석합니다. 이번 버전은 선택 영역의 프레임 경계선을 자동 감지한 뒤 프레임 단위로 전달하고, 결과가 다를 수 있으니 적용 전 투구값을 꼭 확인해주세요.
+          Gemini Vision과 Tesseract 숫자 OCR을 함께 사용합니다. 선택 영역을 프레임 단위로 나눈 뒤 두 결과를 비교하고, 적용 전 투구값을 꼭 확인해주세요.
         </p>
       </div>
     </div>

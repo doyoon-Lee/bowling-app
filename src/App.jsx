@@ -29,6 +29,8 @@ import { createBetRule, calculateBetSettlement, summarizeBetSettlement, ensureBe
 import { groupRecordsByDate } from "./utils/date";
 import { canvasToImageFile, preprocessScoreCanvas } from "./utils/imagePreprocess";
 import { cropCanvasByBox, detectScoreFrameBoxes } from "./utils/frameDetection";
+import { analyzeFramesWithTesseract } from "./utils/tesseractOcr";
+import { getOcrMergeSummary, mergeGeminiAndTesseractFrames } from "./utils/ocrMerge";
 import { getCachedSupabaseClient, getSupabaseClient } from "./utils/supabaseClient";
 
 const BOWLING_RECORD_CACHE_PREFIX = "bowling_records_cache_v1";
@@ -1502,12 +1504,16 @@ const handleFinalSettlement = async () => {
       const formData = new FormData();
       const imageForAnalysis = await createCroppedScoreImageFile();
       const frameImages = await createFrameBasedScoreImages();
+      const tesseractFrames = frameImages.length === 10 ? await analyzeFramesWithTesseract(frameImages) : [];
       formData.append("image", imageForAnalysis);
       formData.append("is_cropped_score_row", cropBox ? "true" : "false");
       formData.append("ocr_mode", frameImages.length === 10 ? "frame_based" : "single_image");
       formData.append("frame_count", String(frameImages.length));
-      formData.append("preprocess_applied", "grayscale_contrast_sharpen_frame_boundary_detection");
+      formData.append("preprocess_applied", "grayscale_contrast_sharpen_frame_boundary_detection_tesseract_compare");
       formData.append("frame_detection", frameImages[0]?.detectionMethod || "none");
+      if (tesseractFrames.length > 0) {
+        formData.append("tesseract_result_json", JSON.stringify(tesseractFrames));
+      }
       frameImages.forEach(({ frame, file }) => {
         formData.append("frame_images", file, file.name);
         formData.append("frame_numbers", String(frame));
@@ -1576,15 +1582,17 @@ const handleFinalSettlement = async () => {
       }
 
       const cumulativeScores = getCumulativeScoresFromData(data);
-      const frameBasedRolls = normalizeGeminiRollsFromFrames(data.frames, data.rolls);
+      const mergedOcrFrames = mergeGeminiAndTesseractFrames(data.frames, tesseractFrames);
+      const framesForRepair = mergedOcrFrames.length > 0 ? mergedOcrFrames : data.frames;
+      const frameBasedRolls = normalizeGeminiRollsFromFrames(framesForRepair, data.rolls);
       const scoreCheckedRolls = repairGeminiFramesByCumulativeScores(
-        data.frames,
+        framesForRepair,
         frameBasedRolls,
         cumulativeScores
       );
       const repairedRolls = repairTenthFrameRolls(
         scoreCheckedRolls,
-        data.frames,
+        framesForRepair,
         data.finalScore,
         cumulativeScores
       );
@@ -1592,9 +1600,9 @@ const handleFinalSettlement = async () => {
 
       setOcrPreviewRolls(repairedRolls);
       setGeminiPreviewFrames(previewFrames);
-      setOcrRawText(data.notes || `confidence: ${data.confidence ?? "정보 없음"}`);
+      setOcrRawText(`${getOcrMergeSummary(framesForRepair)} ${data.notes || `confidence: ${data.confidence ?? "정보 없음"}`}`);
       setAnalysisAttempt((prev) => prev + 1);
-      setCameraMessage("전처리 + Gemini 분석 결과를 확인한 뒤 맞으면 적용해주세요.");
+      setCameraMessage("전처리 + Gemini/Tesseract 혼합 분석 결과를 확인한 뒤 맞으면 적용해주세요.");
     } catch (error) {
       console.error("Gemini Analyze Error:", error);
       setCameraMessage(`사진 분석 중 오류 발생: ${error?.message || "알 수 없는 오류"}`);
