@@ -1886,11 +1886,6 @@ const handleFinalSettlement = async () => {
             onClose={() => setIsCameraModalOpen(false)}
             onAnalyze={analyzeScoreImage}
             onApply={applyOcrPreview}
-            onPreviewRollsChange={(nextRolls) => {
-              setOcrPreviewRolls(nextRolls);
-              setGeminiPreviewFrames(calcBowlingScore(nextRolls).frames);
-              setCameraMessage("수정한 인식 결과를 확인한 뒤 적용해주세요.");
-            }}
           />
         )}
 

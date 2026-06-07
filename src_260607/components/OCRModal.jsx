@@ -1,5 +1,5 @@
 import React from "react";
-import { calcBowlingScore, getPreview, parseGeminiFrameRolls, renderFrameMark } from "../utils/bowling.jsx";
+import { calcBowlingScore, getPreview, renderFrameMark } from "../utils/bowling.jsx";
 
 export default function OCRModal({
   scoreImage,
@@ -19,21 +19,7 @@ export default function OCRModal({
   onClose,
   onAnalyze,
   onApply,
-  onPreviewRollsChange,
 }) {
-  const previewFrames = geminiPreviewFrames.length > 0 ? geminiPreviewFrames : calcBowlingScore(ocrPreviewRolls).frames;
-
-  const updatePreviewFrameMark = (frameIndex, nextMark) => {
-    const frameMarks = calcBowlingScore(ocrPreviewRolls).frames.map((frame) => frame.mark || "");
-    frameMarks[frameIndex] = nextMark;
-
-    const nextRolls = frameMarks.flatMap((mark, index) =>
-      parseGeminiFrameRolls({ frame: index + 1, mark })
-    );
-
-    onPreviewRollsChange(nextRolls);
-  };
-
   return (
     <div className="placeModalBackdrop" onClick={onClose}>
       <div className="placeModal" onClick={(e) => e.stopPropagation()}>
@@ -78,18 +64,10 @@ export default function OCRModal({
               )}
             </div>
 
-            <div className="ocrShootGuide">
-              <strong>정확도를 높이는 촬영 방법</strong>
-              <ul>
-                <li>점수판 전체보다 <b>내 이름이 있는 한 줄</b>만 크게 잡아주세요.</li>
-                <li>프레임 1~10과 최종 점수가 같이 보이게 선택해주세요.</li>
-                <li>모니터를 비스듬히 찍지 말고 최대한 정면에서 촬영해주세요.</li>
-                <li>반사광이 있으면 화면 밝기를 낮추거나 살짝 옆으로 이동해주세요.</li>
-              </ul>
-              <p>
-                {cropBox ? "현재 선택 영역만 분석합니다." : "여러 명 점수판이면 내 점수 줄만 드래그해서 선택한 뒤 분석하는 것을 권장합니다."}
-              </p>
-            </div>
+            <p className="cropGuide">
+              여러 명 점수판이면 내 점수 줄만 직접 드래그해서 선택한 뒤 분석하세요.
+              {cropBox ? " 현재 선택 영역만 분석합니다." : " 영역 미선택 시 전체 사진을 분석합니다."}
+            </p>
           </div>
         )}
 
@@ -99,7 +77,7 @@ export default function OCRModal({
           <div className="ocrPreviewBox">
             <strong>Gemini 분석 투구값</strong>
             <div className="geminiScoreboardPreview">
-              {previewFrames.map((frame) => (
+              {(geminiPreviewFrames.length > 0 ? geminiPreviewFrames : calcBowlingScore(ocrPreviewRolls).frames).map((frame) => (
                 <div className="geminiScoreFrame" key={frame.frame}>
                   <div className="geminiScoreFrameNo">{frame.frame}</div>
                   <div className="geminiScoreFrameMark">
@@ -108,28 +86,6 @@ export default function OCRModal({
                 </div>
               ))}
             </div>
-          </div>
-        )}
-
-        {ocrPreviewRolls.length > 0 && (
-          <div className="ocrCorrectionBox">
-            <div className="ocrCorrectionHeader">
-              <strong>인식 결과 빠른 수정</strong>
-              <span>틀린 프레임만 직접 고친 뒤 적용하세요.</span>
-            </div>
-            <div className="ocrCorrectionGrid">
-              {calcBowlingScore(ocrPreviewRolls).frames.map((frame, index) => (
-                <label className="ocrCorrectionCell" key={`ocr-correct-${frame.frame}`}>
-                  <span>{frame.frame}F</span>
-                  <input
-                    value={renderFrameMark(frame.mark).replace(/\u00A0/g, "").trim()}
-                    placeholder={frame.frame === 10 ? "X|X|X" : "X 또는 9|/"}
-                    onChange={(event) => updatePreviewFrameMark(index, event.target.value)}
-                  />
-                </label>
-              ))}
-            </div>
-            <p>예: 스트라이크는 X, 스페어는 9|/, 거터는 -, 10프레임은 X|9|/ 처럼 입력</p>
           </div>
         )}
 
