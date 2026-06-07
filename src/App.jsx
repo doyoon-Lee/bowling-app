@@ -1287,6 +1287,86 @@ const handleFinalSettlement = async () => {
   };
 
 
+
+  const createCumulativeScoreBandImageFile = async () => {
+    if (!scoreImage) return null;
+
+    const imageUrl = URL.createObjectURL(scoreImage);
+    try {
+      const image = await new Promise((resolve, reject) => {
+        const img = new Image();
+        img.onload = () => resolve(img);
+        img.onerror = reject;
+        img.src = imageUrl;
+      });
+
+      const sourceX = cropBox ? Math.round(image.naturalWidth * cropBox.x) : 0;
+      const sourceY = cropBox ? Math.round(image.naturalHeight * cropBox.y) : 0;
+      const sourceWidth = cropBox ? Math.round(image.naturalWidth * cropBox.width) : image.naturalWidth;
+      const sourceHeight = cropBox ? Math.round(image.naturalHeight * cropBox.height) : image.naturalHeight;
+
+      if (sourceWidth <= 0 || sourceHeight <= 0) return null;
+
+      const scoreRowCanvas = document.createElement("canvas");
+      scoreRowCanvas.width = sourceWidth;
+      scoreRowCanvas.height = sourceHeight;
+      scoreRowCanvas.getContext("2d").drawImage(
+        image,
+        sourceX,
+        sourceY,
+        sourceWidth,
+        sourceHeight,
+        0,
+        0,
+        sourceWidth,
+        sourceHeight
+      );
+
+      const isolatedRow = isolateScoreRowCanvas(scoreRowCanvas, { force: Boolean(cropBox) });
+      const targetRowCanvas = isolatedRow.canvas || scoreRowCanvas;
+
+      // Cumulative scores are normally printed on the lower half of the selected
+      // score row. Cropping this band keeps frame numbers and throw marks out of
+      // Tesseract, which prevents cases such as a visible 19 being read as 7 or
+      // the top frame numbers being mixed into the score sequence.
+      const bandY = Math.round(targetRowCanvas.height * 0.46);
+      const bandHeight = Math.max(1, Math.round(targetRowCanvas.height * 0.5));
+      const bandCanvas = document.createElement("canvas");
+      bandCanvas.width = targetRowCanvas.width;
+      bandCanvas.height = bandHeight;
+      const bandCtx = bandCanvas.getContext("2d");
+      bandCtx.fillStyle = "#ffffff";
+      bandCtx.fillRect(0, 0, bandCanvas.width, bandCanvas.height);
+      bandCtx.drawImage(
+        targetRowCanvas,
+        0,
+        bandY,
+        targetRowCanvas.width,
+        Math.min(bandHeight, targetRowCanvas.height - bandY),
+        0,
+        0,
+        targetRowCanvas.width,
+        Math.min(bandHeight, targetRowCanvas.height - bandY)
+      );
+
+      const preprocessedBandCanvas = preprocessScoreCanvas(bandCanvas, {
+        minWidth: 1500,
+        maxWidth: 2600,
+        paddingRatio: 0.04,
+      });
+
+      return canvasToImageFile(
+        preprocessedBandCanvas || bandCanvas,
+        `cumulative-score-band-${scoreImage.name || "score.jpg"}`,
+        "image/jpeg",
+        0.97
+      );
+    } finally {
+      URL.revokeObjectURL(imageUrl);
+    }
+  };
+
+
   const createFrameBasedScoreImages = async () => {
     if (!scoreImage) return [];
 
@@ -1521,8 +1601,9 @@ const handleFinalSettlement = async () => {
 
     try {
       const imageForAnalysis = await createCroppedScoreImageFile();
+      const cumulativeScoreBandImage = await createCumulativeScoreBandImageFile();
       const frameImages = await createFrameBasedScoreImages();
-      const tesseractCumulativeResult = await analyzeCumulativeScoresWithTesseract(imageForAnalysis);
+      const tesseractCumulativeResult = await analyzeCumulativeScoresWithTesseract(cumulativeScoreBandImage || imageForAnalysis);
       const maxAttempts = 3;
       let bestResult = null;
       let previousResultForRetry =
@@ -1542,7 +1623,7 @@ const handleFinalSettlement = async () => {
         formData.append("is_cropped_score_row", cropBox ? "true" : "false");
         formData.append("ocr_mode", frameImages.length === 10 ? "hybrid_row_and_frame" : "single_image");
         formData.append("frame_count", String(frameImages.length));
-        formData.append("preprocess_applied", "grayscale_contrast_sharpen_frame_boundary_detection_row_frame_merge_tesseract_cumulative_auto_retry");
+        formData.append("preprocess_applied", "grayscale_contrast_sharpen_frame_boundary_detection_row_frame_merge_tesseract_cumulative_score_band_auto_retry");
         formData.append("frame_detection", frameImages[0]?.detectionMethod || "none");
         formData.append("row_isolation", "enabled");
         formData.append("prompt_version", "bowling-ocr-v9-row-isolation-x-finalscore");
@@ -1556,6 +1637,10 @@ const handleFinalSettlement = async () => {
 
         if (tesseractCumulativeResult?.scores?.length > 0) {
           formData.append("tesseract_cumulative_json", JSON.stringify(tesseractCumulativeResult));
+        }
+
+        if (cumulativeScoreBandImage) {
+          formData.append("cumulative_score_band_image", cumulativeScoreBandImage, cumulativeScoreBandImage.name || "cumulative-score-band.jpg");
         }
 
         frameImages.forEach(({ frame, file }) => {

@@ -238,6 +238,44 @@ function estimateGroupSimilarityPenalty(candidate = [], base = []) {
   return penalty;
 }
 
+function estimateVisualFramePrior(candidate = [], frameIndex = 0) {
+  if (!Array.isArray(candidate)) return 0;
+  if (frameIndex >= 9) return 0;
+
+  // If the cumulative scores only tell us that an open frame is worth 9,
+  // [0, 9] and [9, 0] are mathematically identical. Real scoreboards and
+  // bowling games show 9- much more often than -9, and OCR frequently flips
+  // small dash/blank symbols. Prefer the left-heavy open-frame interpretation
+  // unless the frame is a spare or strike. This prevents 7~8F from showing
+  // "- | 9" when the visible mark is "9 -" while the final score is already
+  // correct.
+  const [first, second] = candidate;
+  if (candidate.length === 2 && first === 0 && second > 0 && second <= 9) return 4.5;
+  if (candidate.length === 2 && first > 0 && second === 0 && first <= 9) return -0.8;
+  return 0;
+}
+
+function normalizeAmbiguousOpenFramesByVisualPrior(rolls = [], cumulativeScores = []) {
+  const scores = normalizeScores(cumulativeScores);
+  if (!Array.isArray(rolls) || rolls.length === 0 || scores.length === 0) return rolls;
+
+  const groups = buildRollGroups(rolls);
+  let changed = false;
+  const normalizedGroups = groups.map((group, frameIndex) => {
+    if (frameIndex >= 9 || !Array.isArray(group) || group.length !== 2) return group;
+    const [first, second] = group;
+    if (first !== 0 || second <= 0 || second > 9) return group;
+
+    const delta = getFrameScoreDelta(scores, frameIndex);
+    if (delta !== null && delta !== first + second) return group;
+
+    changed = true;
+    return [second, 0];
+  });
+
+  return changed ? flattenGroups(normalizedGroups).slice(0, 21) : rolls;
+}
+
 function reconstructRollsByCumulativeBeam({ rolls = [], cumulativeScores = [], finalScore = null } = {}) {
   const scores = normalizeScores(cumulativeScores);
   const targetFinal = asNumber(finalScore ?? scores[9]);
@@ -259,6 +297,7 @@ function reconstructRollsByCumulativeBeam({ rolls = [], cumulativeScores = [], f
         const nextRolls = flattenGroups(groups);
         const evidencePenalty = getCompletedFramePenalty(nextRolls, scores, frameIndex);
         const similarityPenalty = estimateGroupSimilarityPenalty(candidate, baseGroups[frameIndex]) * 0.35;
+        const visualPriorPenalty = estimateVisualFramePrior(candidate, frameIndex);
         const impossibleFuturePenalty = (() => {
           const currentTarget = asNumber(scores[frameIndex]);
           if (currentTarget === null) return 0;
@@ -270,7 +309,7 @@ function reconstructRollsByCumulativeBeam({ rolls = [], cumulativeScores = [], f
         nextStates.push({
           groups,
           rolls: nextRolls,
-          penalty: evidencePenalty + similarityPenalty + impossibleFuturePenalty,
+          penalty: evidencePenalty + similarityPenalty + visualPriorPenalty + impossibleFuturePenalty,
         });
       }
     }
@@ -380,12 +419,12 @@ export function buildAdvancedOcrResult({ data = {}, tesseractCumulativeScores = 
     cumulativeScores,
     finalScore,
   });
-  const repairedRolls = preferScoreEvidenceRolls({
+  const repairedRolls = normalizeAmbiguousOpenFramesByVisualPrior(preferScoreEvidenceRolls({
     currentRolls: tenthRepairedRolls,
     evidenceRolls: beamResult?.rolls || [],
     cumulativeScores,
     finalScore,
-  });
+  }), cumulativeScores);
   const previewFrames = calcBowlingScore(repairedRolls).frames;
   const finalMismatch = getFinalMismatch(repairedRolls, finalScore, cumulativeScores);
   const scoreReliability = getScoreReliability(cumulativeScores);
