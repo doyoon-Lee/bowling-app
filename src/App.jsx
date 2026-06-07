@@ -353,6 +353,7 @@ export default function App() {
   const [ocrPreviewRolls, setOcrPreviewRolls] = useState([]);
   const [ocrRawText, setOcrRawText] = useState("");
   const [geminiPreviewFrames, setGeminiPreviewFrames] = useState([]);
+  const [ocrFramePreviews, setOcrFramePreviews] = useState([]);
   const [analysisAttempt, setAnalysisAttempt] = useState(0);
 
   const [rolls, setRolls] = useState([]);
@@ -1270,6 +1271,100 @@ const handleFinalSettlement = async () => {
     }
   };
 
+
+  const createFrameBasedScoreImages = async () => {
+    if (!scoreImage) return [];
+
+    const imageUrl = URL.createObjectURL(scoreImage);
+    try {
+      const image = await new Promise((resolve, reject) => {
+        const img = new Image();
+        img.onload = () => resolve(img);
+        img.onerror = reject;
+        img.src = imageUrl;
+      });
+
+      const sourceX = cropBox ? Math.round(image.naturalWidth * cropBox.x) : 0;
+      const sourceY = cropBox ? Math.round(image.naturalHeight * cropBox.y) : 0;
+      const sourceWidth = cropBox ? Math.round(image.naturalWidth * cropBox.width) : image.naturalWidth;
+      const sourceHeight = cropBox ? Math.round(image.naturalHeight * cropBox.height) : image.naturalHeight;
+
+      if (sourceWidth <= 0 || sourceHeight <= 0) return [];
+
+      const scoreRowCanvas = document.createElement("canvas");
+      scoreRowCanvas.width = sourceWidth;
+      scoreRowCanvas.height = sourceHeight;
+      scoreRowCanvas.getContext("2d").drawImage(
+        image,
+        sourceX,
+        sourceY,
+        sourceWidth,
+        sourceHeight,
+        0,
+        0,
+        sourceWidth,
+        sourceHeight
+      );
+
+      const frameWeights = [1, 1, 1, 1, 1, 1, 1, 1, 1, 1.35];
+      const weightSum = frameWeights.reduce((sum, weight) => sum + weight, 0);
+      let offsetX = 0;
+
+      const frameImages = [];
+      const previewUrls = [];
+
+      for (let index = 0; index < 10; index += 1) {
+        const frameWidth = Math.round((sourceWidth * frameWeights[index]) / weightSum);
+        const remainingWidth = sourceWidth - offsetX;
+        const cropWidth = index === 9 ? remainingWidth : Math.max(1, Math.min(frameWidth, remainingWidth));
+
+        const paddingX = Math.round(cropWidth * 0.06);
+        const paddingY = Math.round(sourceHeight * 0.08);
+        const frameCanvas = document.createElement("canvas");
+        frameCanvas.width = cropWidth + paddingX * 2;
+        frameCanvas.height = sourceHeight + paddingY * 2;
+
+        const frameCtx = frameCanvas.getContext("2d");
+        frameCtx.fillStyle = "#ffffff";
+        frameCtx.fillRect(0, 0, frameCanvas.width, frameCanvas.height);
+        frameCtx.drawImage(
+          scoreRowCanvas,
+          offsetX,
+          0,
+          cropWidth,
+          sourceHeight,
+          paddingX,
+          paddingY,
+          cropWidth,
+          sourceHeight
+        );
+
+        const blob = await new Promise((resolve) => {
+          frameCanvas.toBlob((nextBlob) => resolve(nextBlob), "image/jpeg", 0.95);
+        });
+
+        if (blob) {
+          frameImages.push({
+            frame: index + 1,
+            file: new File([blob], `frame-${String(index + 1).padStart(2, "0")}.jpg`, { type: "image/jpeg" }),
+          });
+          previewUrls.push({ frame: index + 1, url: URL.createObjectURL(blob) });
+        }
+
+        offsetX += cropWidth;
+      }
+
+      setOcrFramePreviews((prev) => {
+        prev.forEach((item) => item?.url && URL.revokeObjectURL(item.url));
+        return previewUrls;
+      });
+
+      return frameImages;
+    } finally {
+      URL.revokeObjectURL(imageUrl);
+    }
+  };
+
   const currentCropBox = cropDrag ? normalizeCropBox(cropDrag.start, cropDrag.current) : cropBox;
 
   const handleScoreImageChange = (event) => {
@@ -1287,6 +1382,10 @@ const handleFinalSettlement = async () => {
     setOcrPreviewRolls([]);
     setOcrRawText("");
     setGeminiPreviewFrames([]);
+    setOcrFramePreviews((prev) => {
+      prev.forEach((item) => item?.url && URL.revokeObjectURL(item.url));
+      return [];
+    });
     setAnalysisAttempt(0);
     setIsCameraModalOpen(true);
   };
@@ -1403,8 +1502,15 @@ const handleFinalSettlement = async () => {
     try {
       const formData = new FormData();
       const imageForAnalysis = await createCroppedScoreImageFile();
+      const frameImages = await createFrameBasedScoreImages();
       formData.append("image", imageForAnalysis);
       formData.append("is_cropped_score_row", cropBox ? "true" : "false");
+      formData.append("ocr_mode", frameImages.length === 10 ? "frame_based" : "single_image");
+      formData.append("frame_count", String(frameImages.length));
+      frameImages.forEach(({ frame, file }) => {
+        formData.append("frame_images", file, file.name);
+        formData.append("frame_numbers", String(frame));
+      });
 
       if (ocrPreviewRolls.length > 0 || geminiPreviewFrames.length > 0) {
         formData.append(
@@ -1512,6 +1618,10 @@ const handleFinalSettlement = async () => {
     setOcrPreviewRolls([]);
     setOcrRawText("");
     setGeminiPreviewFrames([]);
+    setOcrFramePreviews((prev) => {
+      prev.forEach((item) => item?.url && URL.revokeObjectURL(item.url));
+      return [];
+    });
     setAnalysisAttempt(0);
   };
 
@@ -1882,6 +1992,7 @@ const handleFinalSettlement = async () => {
             cameraMessage={cameraMessage}
             ocrPreviewRolls={ocrPreviewRolls}
             geminiPreviewFrames={geminiPreviewFrames}
+            ocrFramePreviews={ocrFramePreviews}
             isAnalyzingScoreImage={isAnalyzingScoreImage}
             onClose={() => setIsCameraModalOpen(false)}
             onAnalyze={analyzeScoreImage}

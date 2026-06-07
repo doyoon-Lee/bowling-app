@@ -15,6 +15,7 @@ export default function OCRModal({
   cameraMessage,
   ocrPreviewRolls,
   geminiPreviewFrames,
+  ocrFramePreviews = [],
   isAnalyzingScoreImage,
   onClose,
   onAnalyze,
@@ -87,9 +88,26 @@ export default function OCRModal({
                 <li>반사광이 있으면 화면 밝기를 낮추거나 살짝 옆으로 이동해주세요.</li>
               </ul>
               <p>
-                {cropBox ? "현재 선택 영역만 분석합니다." : "여러 명 점수판이면 내 점수 줄만 드래그해서 선택한 뒤 분석하는 것을 권장합니다."}
+                {cropBox ? "현재 선택 영역을 1~10프레임으로 나눠 분석합니다." : "여러 명 점수판이면 내 점수 줄만 드래그해서 선택한 뒤 분석하는 것을 권장합니다."}
               </p>
             </div>
+
+            {ocrFramePreviews.length > 0 && (
+              <div className="ocrFramePreviewBox">
+                <div className="ocrFramePreviewHeader">
+                  <strong>프레임 단위 분석 영역</strong>
+                  <span>선택한 점수 줄을 1~10프레임으로 나눠 인식합니다.</span>
+                </div>
+                <div className="ocrFramePreviewGrid">
+                  {ocrFramePreviews.map((item) => (
+                    <div className="ocrFramePreviewCell" key={`ocr-frame-preview-${item.frame}`}>
+                      <span>{item.frame}F</span>
+                      <img src={item.url} alt={`${item.frame}프레임 분석 영역`} />
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
           </div>
         )}
 
@@ -144,7 +162,7 @@ export default function OCRModal({
         )}
 
         <p className="cameraGuide">
-          Gemini Vision으로 사진을 분석합니다. 결과가 다를 수 있으니 적용 전 투구값을 꼭 확인해주세요.
+          Gemini Vision으로 사진을 분석합니다. 이번 버전은 선택 영역을 프레임 단위로 나누어 전달하고, 결과가 다를 수 있으니 적용 전 투구값을 꼭 확인해주세요.
         </p>
       </div>
     </div>
