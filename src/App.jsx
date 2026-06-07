@@ -28,6 +28,7 @@ import { createRoom, findRoomByCode, findRoomById, joinRoomById, upsertRoomScore
 import { createBetRule, calculateBetSettlement, summarizeBetSettlement, ensureBetRule } from "./utils/betting";
 import { groupRecordsByDate } from "./utils/date";
 import { canvasToImageFile, preprocessScoreCanvas } from "./utils/imagePreprocess";
+import { cropCanvasByBox, detectScoreFrameBoxes } from "./utils/frameDetection";
 import { getCachedSupabaseClient, getSupabaseClient } from "./utils/supabaseClient";
 
 const BOWLING_RECORD_CACHE_PREFIX = "bowling_records_cache_v1";
@@ -1314,38 +1315,17 @@ const handleFinalSettlement = async () => {
         sourceHeight
       );
 
-      const frameWeights = [1, 1, 1, 1, 1, 1, 1, 1, 1, 1.35];
-      const weightSum = frameWeights.reduce((sum, weight) => sum + weight, 0);
-      let offsetX = 0;
+      const detectedFrameBoxes = detectScoreFrameBoxes(scoreRowCanvas);
 
       const frameImages = [];
       const previewUrls = [];
 
-      for (let index = 0; index < 10; index += 1) {
-        const frameWidth = Math.round((sourceWidth * frameWeights[index]) / weightSum);
-        const remainingWidth = sourceWidth - offsetX;
-        const cropWidth = index === 9 ? remainingWidth : Math.max(1, Math.min(frameWidth, remainingWidth));
-
-        const paddingX = Math.round(cropWidth * 0.06);
-        const paddingY = Math.round(sourceHeight * 0.08);
-        const frameCanvas = document.createElement("canvas");
-        frameCanvas.width = cropWidth + paddingX * 2;
-        frameCanvas.height = sourceHeight + paddingY * 2;
-
-        const frameCtx = frameCanvas.getContext("2d");
-        frameCtx.fillStyle = "#ffffff";
-        frameCtx.fillRect(0, 0, frameCanvas.width, frameCanvas.height);
-        frameCtx.drawImage(
-          scoreRowCanvas,
-          offsetX,
-          0,
-          cropWidth,
-          sourceHeight,
-          paddingX,
-          paddingY,
-          cropWidth,
-          sourceHeight
-        );
+      for (let index = 0; index < detectedFrameBoxes.length; index += 1) {
+        const box = detectedFrameBoxes[index];
+        const frameCanvas = cropCanvasByBox(scoreRowCanvas, box, {
+          paddingXRatio: index === 9 ? 0.045 : 0.06,
+          paddingYRatio: 0.08,
+        });
 
         const preprocessedFrameCanvas = preprocessScoreCanvas(frameCanvas, {
           minWidth: index === 9 ? 360 : 260,
@@ -1363,11 +1343,14 @@ const handleFinalSettlement = async () => {
           frameImages.push({
             frame: index + 1,
             file,
+            detectionMethod: box.method,
           });
-          previewUrls.push({ frame: index + 1, url: URL.createObjectURL(file) });
+          previewUrls.push({
+            frame: index + 1,
+            url: URL.createObjectURL(file),
+            detectionMethod: box.method,
+          });
         }
-
-        offsetX += cropWidth;
       }
 
       setOcrFramePreviews((prev) => {
@@ -1523,7 +1506,8 @@ const handleFinalSettlement = async () => {
       formData.append("is_cropped_score_row", cropBox ? "true" : "false");
       formData.append("ocr_mode", frameImages.length === 10 ? "frame_based" : "single_image");
       formData.append("frame_count", String(frameImages.length));
-      formData.append("preprocess_applied", "grayscale_contrast_sharpen");
+      formData.append("preprocess_applied", "grayscale_contrast_sharpen_frame_boundary_detection");
+      formData.append("frame_detection", frameImages[0]?.detectionMethod || "none");
       frameImages.forEach(({ frame, file }) => {
         formData.append("frame_images", file, file.name);
         formData.append("frame_numbers", String(frame));

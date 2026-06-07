@@ -88,7 +88,7 @@ export default function OCRModal({
                 <li>반사광이 있으면 화면 밝기를 낮추거나 살짝 옆으로 이동해주세요.</li>
               </ul>
               <p>
-                {cropBox ? "선택 영역을 OCR용으로 보정한 뒤 1~10프레임으로 나눠 분석합니다." : "여러 명 점수판이면 내 점수 줄만 드래그해서 선택한 뒤 분석하는 것을 권장합니다."}
+                {cropBox ? "선택 영역의 세로 경계선을 먼저 감지한 뒤 1~10프레임으로 나눠 분석합니다." : "여러 명 점수판이면 내 점수 줄만 드래그해서 선택한 뒤 분석하는 것을 권장합니다."}
               </p>
             </div>
 
@@ -96,7 +96,7 @@ export default function OCRModal({
               <div className="ocrFramePreviewBox">
                 <div className="ocrFramePreviewHeader">
                   <strong>프레임 단위 분석 영역</strong>
-                  <span>대비/선명도 보정이 적용된 프레임 이미지로 인식합니다.</span>
+                  <span>자동 경계 감지와 대비/선명도 보정이 적용된 프레임 이미지로 인식합니다.</span>
                 </div>
                 <div className="ocrFramePreviewGrid">
                   {ocrFramePreviews.map((item) => (
@@ -162,7 +162,7 @@ export default function OCRModal({
         )}
 
         <p className="cameraGuide">
-          Gemini Vision으로 사진을 분석합니다. 이번 버전은 선택 영역을 OCR용으로 보정한 뒤 프레임 단위로 전달하고, 결과가 다를 수 있으니 적용 전 투구값을 꼭 확인해주세요.
+          Gemini Vision으로 사진을 분석합니다. 이번 버전은 선택 영역의 프레임 경계선을 자동 감지한 뒤 프레임 단위로 전달하고, 결과가 다를 수 있으니 적용 전 투구값을 꼭 확인해주세요.
         </p>
       </div>
     </div>
