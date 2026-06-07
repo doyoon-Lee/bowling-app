@@ -8,8 +8,6 @@ import {
   parseGeminiFrameRolls,
   normalizeGeminiRollsFromFrames,
   repairTenthFrameRolls,
-  getCumulativeScoresFromData,
-  repairGeminiFramesByCumulativeScores,
   isCompleteGameRolls,
 } from "./utils/bowling";
 
@@ -31,6 +29,7 @@ import { canvasToImageFile, preprocessScoreCanvas } from "./utils/imagePreproces
 import { cropCanvasByBox, detectScoreFrameBoxes } from "./utils/frameDetection";
 import { analyzeFramesWithTesseract } from "./utils/tesseractOcr";
 import { getOcrMergeSummary, mergeGeminiAndTesseractFrames } from "./utils/ocrMerge";
+import { buildOcrReviewFrames, getOcrReviewSummary } from "./utils/ocrReview";
 import { buildGeminiBowlingOcrPrompt } from "./utils/ocr/geminiPrompt";
 import { getCachedSupabaseClient, getSupabaseClient } from "./utils/supabaseClient";
 
@@ -359,6 +358,7 @@ export default function App() {
   const [ocrRawText, setOcrRawText] = useState("");
   const [geminiPreviewFrames, setGeminiPreviewFrames] = useState([]);
   const [ocrFramePreviews, setOcrFramePreviews] = useState([]);
+  const [ocrReviewFrames, setOcrReviewFrames] = useState([]);
   const [analysisAttempt, setAnalysisAttempt] = useState(0);
 
   const [rolls, setRolls] = useState([]);
@@ -1384,6 +1384,7 @@ const handleFinalSettlement = async () => {
     setOcrPreviewRolls([]);
     setOcrRawText("");
     setGeminiPreviewFrames([]);
+    setOcrReviewFrames([]);
     setOcrFramePreviews((prev) => {
       prev.forEach((item) => item?.url && URL.revokeObjectURL(item.url));
       return [];
@@ -1613,10 +1614,18 @@ const handleFinalSettlement = async () => {
         cumulativeScores
       );
       const previewFrames = calcBowlingScore(repairedRolls).frames;
+      const reviewFrames = buildOcrReviewFrames({
+        frames: framesForRepair,
+        rolls: repairedRolls,
+        framePreviews: ocrFramePreviews,
+        cumulativeScores,
+        finalScore: data.finalScore,
+      });
 
       setOcrPreviewRolls(repairedRolls);
       setGeminiPreviewFrames(previewFrames);
-      setOcrRawText(`${getOcrMergeSummary(framesForRepair)} ${data.notes || `confidence: ${data.confidence ?? "정보 없음"}`}`);
+      setOcrReviewFrames(reviewFrames);
+      setOcrRawText(`${getOcrMergeSummary(framesForRepair)} ${getOcrReviewSummary(reviewFrames)} ${data.notes || `confidence: ${data.confidence ?? "정보 없음"}`}`);
       setAnalysisAttempt((prev) => prev + 1);
       setCameraMessage("전처리 + Gemini/Tesseract 혼합 분석 결과를 확인한 뒤 맞으면 적용해주세요.");
     } catch (error) {
@@ -1643,6 +1652,7 @@ const handleFinalSettlement = async () => {
     setOcrPreviewRolls([]);
     setOcrRawText("");
     setGeminiPreviewFrames([]);
+    setOcrReviewFrames([]);
     setOcrFramePreviews((prev) => {
       prev.forEach((item) => item?.url && URL.revokeObjectURL(item.url));
       return [];
@@ -2018,6 +2028,7 @@ const handleFinalSettlement = async () => {
             ocrPreviewRolls={ocrPreviewRolls}
             geminiPreviewFrames={geminiPreviewFrames}
             ocrFramePreviews={ocrFramePreviews}
+            ocrReviewFrames={ocrReviewFrames}
             isAnalyzingScoreImage={isAnalyzingScoreImage}
             onClose={() => setIsCameraModalOpen(false)}
             onAnalyze={analyzeScoreImage}
@@ -2025,6 +2036,11 @@ const handleFinalSettlement = async () => {
             onPreviewRollsChange={(nextRolls) => {
               setOcrPreviewRolls(nextRolls);
               setGeminiPreviewFrames(calcBowlingScore(nextRolls).frames);
+              setOcrReviewFrames((prev) =>
+                prev.map((item) =>
+                  item.needsReview ? { ...item, reasons: item.reasons?.filter((reason) => reason !== "투구값 인식 불확실") || [] } : item
+                )
+              );
               setCameraMessage("수정한 인식 결과를 확인한 뒤 적용해주세요.");
             }}
           />

@@ -16,6 +16,7 @@ export default function OCRModal({
   ocrPreviewRolls,
   geminiPreviewFrames,
   ocrFramePreviews = [],
+  ocrReviewFrames = [],
   isAnalyzingScoreImage,
   onClose,
   onAnalyze,
@@ -23,6 +24,7 @@ export default function OCRModal({
   onPreviewRollsChange,
 }) {
   const previewFrames = geminiPreviewFrames.length > 0 ? geminiPreviewFrames : calcBowlingScore(ocrPreviewRolls).frames;
+  const reviewTargets = ocrReviewFrames.filter((frame) => frame.needsReview);
 
   const updatePreviewFrameMark = (frameIndex, nextMark) => {
     const frameMarks = calcBowlingScore(ocrPreviewRolls).frames.map((frame) => frame.mark || "");
@@ -112,6 +114,70 @@ export default function OCRModal({
         )}
 
         {cameraMessage && <div className="placeMessage">{cameraMessage}</div>}
+
+
+        {ocrPreviewRolls.length > 0 && (
+          <div className={reviewTargets.length > 0 ? "ocrReviewBox needsReview" : "ocrReviewBox stable"}>
+            <div className="ocrReviewHeader">
+              <div>
+                <strong>{reviewTargets.length > 0 ? "확인 필요한 프레임" : "검토 결과"}</strong>
+                <span>신뢰도, 누적점수 검산, Gemini/Tesseract 비교 결과를 기준으로 표시합니다.</span>
+              </div>
+              <b>{reviewTargets.length > 0 ? `${reviewTargets.length}개 확인` : "확인 필요 없음"}</b>
+            </div>
+
+            {reviewTargets.length > 0 ? (
+              <div className="ocrReviewList">
+                {reviewTargets.map((item) => {
+                  const currentFrame = previewFrames[item.frame - 1];
+                  const currentMark = renderFrameMark(getPreview(currentFrame || {})).replace(/\u00A0/g, "").trim();
+                  const quickMarks = item.frame === 10
+                    ? ["X|X|X", "X|9|/", "X|-|/", "9|/|X", "9|-", "-|/"]
+                    : ["X", "9|/", "8|/", "7|/", "9|-", "8|1", "-|-", "-|/"];
+
+                  return (
+                    <div className="ocrReviewCard" key={`ocr-review-${item.frame}`}>
+                      <div className="ocrReviewCardTop">
+                        <div>
+                          <strong>{item.frame}프레임</strong>
+                          <span>신뢰도 {item.confidencePercent}% · {item.selectedSource === "tesseract" ? "Tesseract 선택" : "Gemini 선택"}</span>
+                        </div>
+                        <em>{currentMark || "미인식"}</em>
+                      </div>
+
+                      {item.imageUrl && (
+                        <img className="ocrReviewFrameImage" src={item.imageUrl} alt={`${item.frame}프레임 원본`} />
+                      )}
+
+                      <div className="ocrReviewReasons">
+                        {item.reasons.map((reason) => <span key={`${item.frame}-${reason}`}>{reason}</span>)}
+                      </div>
+
+                      <div className="ocrQuickMarks">
+                        {quickMarks.map((mark) => (
+                          <button type="button" key={`${item.frame}-${mark}`} onClick={() => updatePreviewFrameMark(item.frame - 1, mark)}>
+                            {mark.replace(/\|/g, " | ")}
+                          </button>
+                        ))}
+                      </div>
+
+                      <label className="ocrReviewManualInput">
+                        직접 수정
+                        <input
+                          value={currentMark}
+                          placeholder={item.frame === 10 ? "X|X|X" : "X 또는 9|/"}
+                          onChange={(event) => updatePreviewFrameMark(item.frame - 1, event.target.value)}
+                        />
+                      </label>
+                    </div>
+                  );
+                })}
+              </div>
+            ) : (
+              <p className="ocrReviewStableText">모든 프레임이 안정적으로 인식되었습니다. 그래도 실제 점수판과 한 번만 비교한 뒤 적용해주세요.</p>
+            )}
+          </div>
+        )}
 
         {ocrPreviewRolls.length > 0 && (
           <div className="ocrPreviewBox">
