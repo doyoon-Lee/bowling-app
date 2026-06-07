@@ -3687,3 +3687,129 @@ body {
     border-radius: 16px;
   }
 }
+
+/* Compact mobile OCR modal layout: keep the wider preview but reduce vertical
+   padding/gaps so selecting a score row requires less scrolling on phones. */
+@media (max-width: 520px) {
+  .ocrPhotoModal {
+    max-height: calc(100dvh - 12px);
+    overflow-y: auto;
+    padding: 8px;
+    border-radius: 18px;
+  }
+
+  .ocrPhotoModal .placeModalHeader {
+    margin-bottom: 6px;
+    gap: 8px;
+  }
+
+  .ocrPhotoModal .placeModalHeader strong {
+    font-size: 15px;
+  }
+
+  .ocrPhotoModal .placeModalHeader span {
+    font-size: 11px;
+    line-height: 1.25;
+  }
+
+  .ocrPhotoModal .placeModalHeader button {
+    padding: 7px 10px;
+    border-radius: 10px;
+    font-size: 12px;
+  }
+
+  .ocrPhotoModal .cropPanel {
+    gap: 6px;
+  }
+
+  .ocrPhotoModal .cropToolbar {
+    margin-bottom: 6px;
+    padding: 7px 8px;
+    border-radius: 12px;
+    gap: 6px;
+  }
+
+  .ocrPhotoModal .cropToolbarText {
+    min-height: 0;
+    font-size: 11px;
+  }
+
+  .ocrPhotoModal .cropToolbar button {
+    padding: 7px 9px;
+    border-radius: 10px;
+    font-size: 11px;
+  }
+
+  .ocrPhotoModal .cropImageWrap {
+    margin: 0;
+  }
+
+  .ocrPhotoModal .cropImageStage {
+    border-radius: 12px;
+  }
+
+  .ocrPhotoModal .ocrShootGuide {
+    margin-top: 6px;
+    padding: 8px 10px;
+    border-radius: 12px;
+  }
+
+  .ocrPhotoModal .ocrShootGuide strong {
+    font-size: 12px;
+    margin-bottom: 4px;
+  }
+
+  .ocrPhotoModal .ocrShootGuide ul {
+    padding-left: 16px;
+    font-size: 11px;
+    line-height: 1.35;
+  }
+
+  .ocrPhotoModal .placeMessage {
+    margin: 6px 0;
+    padding: 8px 10px;
+    font-size: 12px;
+    border-radius: 12px;
+  }
+
+  .ocrPhotoModal .ocrPreviewBox {
+    margin: 8px 0;
+    padding: 9px;
+    border-radius: 14px;
+  }
+
+  .ocrPhotoModal .simpleOcrResultHeader {
+    margin-bottom: 8px;
+    gap: 8px;
+  }
+
+  .ocrPhotoModal .simpleOcrResultHeader strong {
+    font-size: 14px;
+  }
+
+  .ocrPhotoModal .simpleOcrResultHeader span {
+    font-size: 11px;
+  }
+
+  .ocrPhotoModal .simpleOcrResultHeader b {
+    padding: 6px 9px;
+    font-size: 13px;
+  }
+
+  .ocrPhotoModal .geminiScoreboardPreview {
+    gap: 5px;
+  }
+
+  .ocrPhotoModal .manualPlaceButton {
+    margin-top: 7px;
+    padding: 11px 12px;
+    border-radius: 13px;
+    font-size: 14px;
+  }
+
+  .ocrPhotoModal .cameraGuide {
+    margin: 7px 0 0;
+    font-size: 11px;
+    line-height: 1.35;
+  }
+}
