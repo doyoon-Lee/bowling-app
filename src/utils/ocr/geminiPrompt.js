@@ -57,6 +57,7 @@ export function buildGeminiBowlingOcrPrompt({ previousResult = null, retryAttemp
 - 이전 누적 56, 현재 누적 76인데 6 6으로 읽으면 12점이라 틀렸다.
 - 9프레임 누적 192, finalScore 222인데 10프레임이 X X로 보이면 X X X일 가능성이 높다.
 - 1프레임 9/ 후 2프레임 누적점수가 40이면 2프레임은 9/가 아니라 X일 가능성이 높다.
+- X 표시가 삼각형/화살표/검은 리본처럼 보일 수 있다. 같은 모양이 반복되고 누적점수가 30씩 증가하면 X로 판단한다.
 - X와 9/가 헷갈리면 cumulativeScores를 우선한다.
 - 8, 6, 9 숫자가 헷갈리면 점수 차이로 역산한다.
 
@@ -77,6 +78,7 @@ previous_result_json이 존재하면 이전 분석 결과가 틀렸을 가능성
 - 투구 기호만 보고 판단하지 마라.
 - 반드시 cumulativeScores와 교차 검증한다.
 - cumulativeScores와 맞지 않는 프레임은 다시 추론한다.
+- 한 선수 행 crop 안에 다른 선수 행이 약간 섞여 있어도 가장 아래쪽 또는 가장 크게 보이는 선택 대상 행의 누적점수를 우선한다.
 - finalScore와 맞지 않으면 10프레임 보너스 투구를 재검토한다.
 - cumulativeScores 배열에는 화면 아래의 누적 점수 10개를 반드시 왼쪽부터 숫자로 넣는다.
 - finalScore에는 마지막에 보이는 최종 점수를 넣는다.

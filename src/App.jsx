@@ -26,6 +26,7 @@ import { createRoom, findRoomByCode, findRoomById, joinRoomById, upsertRoomScore
 import { createBetRule, calculateBetSettlement, summarizeBetSettlement, ensureBetRule } from "./utils/betting";
 import { groupRecordsByDate } from "./utils/date";
 import { canvasToImageFile, preprocessScoreCanvas } from "./utils/imagePreprocess";
+import { isolateScoreRowCanvas } from "./utils/rowIsolation";
 import { cropCanvasByBox, detectScoreFrameBoxes } from "./utils/frameDetection";
 import { analyzeCumulativeScoresWithTesseract } from "./utils/tesseractOcr";
 import { buildOcrReviewFrames, getOcrReviewSummary } from "./utils/ocrReview";
@@ -1265,13 +1266,15 @@ const handleFinalSettlement = async () => {
         sourceHeight
       );
 
-      const preprocessedCanvas = preprocessScoreCanvas(canvas, {
+      const isolatedRow = isolateScoreRowCanvas(canvas, { force: Boolean(cropBox) });
+      const rowCanvas = isolatedRow.canvas || canvas;
+      const preprocessedCanvas = preprocessScoreCanvas(rowCanvas, {
         minWidth: 1400,
         maxWidth: 2400,
         paddingRatio: 0.025,
       });
       const file = await canvasToImageFile(
-        preprocessedCanvas || canvas,
+        preprocessedCanvas || rowCanvas,
         `preprocessed-${cropBox ? "cropped" : "full"}-${scoreImage.name || "score.jpg"}`,
         "image/jpeg",
         0.96
@@ -1318,14 +1321,16 @@ const handleFinalSettlement = async () => {
         sourceHeight
       );
 
-      const detectedFrameBoxes = detectScoreFrameBoxes(scoreRowCanvas);
+      const isolatedRow = isolateScoreRowCanvas(scoreRowCanvas, { force: Boolean(cropBox) });
+      const targetRowCanvas = isolatedRow.canvas || scoreRowCanvas;
+      const detectedFrameBoxes = detectScoreFrameBoxes(targetRowCanvas);
 
       const frameImages = [];
       const previewUrls = [];
 
       for (let index = 0; index < detectedFrameBoxes.length; index += 1) {
         const box = detectedFrameBoxes[index];
-        const frameCanvas = cropCanvasByBox(scoreRowCanvas, box, {
+        const frameCanvas = cropCanvasByBox(targetRowCanvas, box, {
           paddingXRatio: index === 9 ? 0.045 : 0.06,
           paddingYRatio: 0.08,
         });
@@ -1539,7 +1544,8 @@ const handleFinalSettlement = async () => {
         formData.append("frame_count", String(frameImages.length));
         formData.append("preprocess_applied", "grayscale_contrast_sharpen_frame_boundary_detection_row_frame_merge_tesseract_cumulative_auto_retry");
         formData.append("frame_detection", frameImages[0]?.detectionMethod || "none");
-        formData.append("prompt_version", "bowling-ocr-v8-advanced-accuracy");
+        formData.append("row_isolation", "enabled");
+        formData.append("prompt_version", "bowling-ocr-v9-row-isolation-x-finalscore");
         formData.append(
           "analysis_prompt",
           buildGeminiBowlingOcrPrompt({

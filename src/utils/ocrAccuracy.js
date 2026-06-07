@@ -167,6 +167,139 @@ export function repairRollsByScoreEvidence({ rolls = [], cumulativeScores = [], 
   return best.rolls;
 }
 
+
+function scoreEvidencePenalty(rolls = [], cumulativeScores = [], finalScore = null) {
+  const score = calcBowlingScore(rolls);
+  let penalty = 0;
+
+  for (let index = 0; index < 10; index += 1) {
+    const target = asNumber(cumulativeScores[index]);
+    if (target === null) continue;
+    const actual = asNumber(score.frames[index]?.total);
+    if (actual === null) {
+      penalty += 90;
+    } else {
+      penalty += Math.abs(actual - target) * (index === 9 ? 3.2 : 1.8);
+    }
+  }
+
+  const targetFinal = asNumber(finalScore ?? cumulativeScores[9]);
+  const actualFinal = asNumber(score.frames[9]?.total ?? score.total);
+  if (targetFinal !== null) {
+    penalty += actualFinal === null ? 150 : Math.abs(actualFinal - targetFinal) * 5;
+  }
+
+  return penalty;
+}
+
+function buildCandidateGroupsByFrame(baseGroups = []) {
+  return Array.from({ length: 10 }, (_, index) => {
+    const current = Array.isArray(baseGroups[index]) ? baseGroups[index] : [];
+    return index === 9 ? tenthFrameCandidates(current) : normalFrameCandidates(current);
+  });
+}
+
+function getCompletedFramePenalty(rolls = [], cumulativeScores = [], throughFrameIndex = 0) {
+  const score = calcBowlingScore(rolls);
+  let penalty = 0;
+
+  for (let index = 0; index <= throughFrameIndex; index += 1) {
+    const target = asNumber(cumulativeScores[index]);
+    if (target === null) continue;
+    const actual = asNumber(score.frames[index]?.total);
+    if (actual === null || actual === "") {
+      penalty += 45;
+    } else {
+      penalty += Math.abs(Number(actual) - target) * (index >= 8 ? 2.2 : 1.4);
+    }
+  }
+
+  return penalty;
+}
+
+function estimateGroupSimilarityPenalty(candidate = [], base = []) {
+  if (!Array.isArray(base) || base.length === 0) return 0;
+  const maxLength = Math.max(candidate.length, base.length);
+  let penalty = Math.abs(candidate.length - base.length) * 1.5;
+  for (let index = 0; index < maxLength; index += 1) {
+    if (candidate[index] === undefined || base[index] === undefined) continue;
+    if (candidate[index] !== base[index]) penalty += Math.abs(candidate[index] - base[index]) * 0.12 + 0.8;
+  }
+  return penalty;
+}
+
+function reconstructRollsByCumulativeBeam({ rolls = [], cumulativeScores = [], finalScore = null } = {}) {
+  const scores = normalizeScores(cumulativeScores);
+  const targetFinal = asNumber(finalScore ?? scores[9]);
+  if (scores.length < 6 && targetFinal === null) return null;
+
+  const baseGroups = buildRollGroups(rolls);
+  while (baseGroups.length < 10) baseGroups.push([]);
+  const candidatesByFrame = buildCandidateGroupsByFrame(baseGroups);
+  const beamSize = 240;
+  let states = [{ groups: [], rolls: [], penalty: 0 }];
+
+  for (let frameIndex = 0; frameIndex < 10; frameIndex += 1) {
+    const nextStates = [];
+    const candidates = candidatesByFrame[frameIndex];
+
+    for (const state of states) {
+      for (const candidate of candidates) {
+        const groups = [...state.groups, candidate];
+        const nextRolls = flattenGroups(groups);
+        const evidencePenalty = getCompletedFramePenalty(nextRolls, scores, frameIndex);
+        const similarityPenalty = estimateGroupSimilarityPenalty(candidate, baseGroups[frameIndex]);
+        const impossibleFuturePenalty = (() => {
+          const currentTarget = asNumber(scores[frameIndex]);
+          if (currentTarget === null) return 0;
+          const actual = asNumber(calcBowlingScore(nextRolls).frames[frameIndex]?.total);
+          if (actual === null) return 0;
+          return actual > currentTarget + 35 ? 35 : 0;
+        })();
+
+        nextStates.push({
+          groups,
+          rolls: nextRolls,
+          penalty: evidencePenalty + similarityPenalty + impossibleFuturePenalty,
+        });
+      }
+    }
+
+    nextStates.sort((a, b) => a.penalty - b.penalty);
+    states = nextStates.slice(0, beamSize);
+  }
+
+  let best = null;
+  for (const state of states) {
+    const finalPenalty = scoreEvidencePenalty(state.rolls, scores, targetFinal);
+    const totalPenalty = finalPenalty + state.penalty * 0.18;
+    if (!best || totalPenalty < best.penalty) {
+      best = { rolls: state.rolls.slice(0, 21), penalty: totalPenalty };
+    }
+  }
+
+  if (!best) return null;
+  return best;
+}
+
+function preferScoreEvidenceRolls({ currentRolls = [], evidenceRolls = [], cumulativeScores = [], finalScore = null } = {}) {
+  if (!Array.isArray(evidenceRolls) || evidenceRolls.length === 0) return currentRolls;
+  const currentPenalty = scoreEvidencePenalty(currentRolls, cumulativeScores, finalScore);
+  const evidencePenalty = scoreEvidencePenalty(evidenceRolls, cumulativeScores, finalScore);
+
+  if (evidencePenalty + 6 < currentPenalty) return evidenceRolls;
+
+  const currentTotal = asNumber(calcBowlingScore(currentRolls).frames[9]?.total ?? calcBowlingScore(currentRolls).total);
+  const evidenceTotal = asNumber(calcBowlingScore(evidenceRolls).frames[9]?.total ?? calcBowlingScore(evidenceRolls).total);
+  const targetFinal = asNumber(finalScore ?? cumulativeScores[9]);
+
+  if (targetFinal !== null && evidenceTotal === targetFinal && currentTotal !== targetFinal) {
+    return evidenceRolls;
+  }
+
+  return currentRolls;
+}
+
 function getFinalMismatch(rolls = [], finalScore = null, cumulativeScores = []) {
   const target = asNumber(finalScore ?? cumulativeScores[9]);
   if (target === null) return false;
@@ -190,12 +323,23 @@ export function buildAdvancedOcrResult({ data = {}, tesseractCumulativeScores = 
     cumulativeScores,
     finalScore,
   });
-  const repairedRolls = repairTenthFrameRolls(
+  const tenthRepairedRolls = repairTenthFrameRolls(
     scoreEvidenceRolls,
     Array.isArray(data.frames) ? data.frames : [],
     finalScore,
     cumulativeScores
   );
+  const beamResult = reconstructRollsByCumulativeBeam({
+    rolls: tenthRepairedRolls,
+    cumulativeScores,
+    finalScore,
+  });
+  const repairedRolls = preferScoreEvidenceRolls({
+    currentRolls: tenthRepairedRolls,
+    evidenceRolls: beamResult?.rolls || [],
+    cumulativeScores,
+    finalScore,
+  });
   const previewFrames = calcBowlingScore(repairedRolls).frames;
   const finalMismatch = getFinalMismatch(repairedRolls, finalScore, cumulativeScores);
   const scoreReliability = getScoreReliability(cumulativeScores);
