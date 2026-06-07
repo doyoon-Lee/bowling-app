@@ -1280,9 +1280,9 @@ const handleFinalSettlement = async () => {
       });
       const file = await canvasToImageFile(
         preprocessedCanvas || rowCanvas,
-        `preprocessed-${cropBox ? "cropped" : "full"}-${scoreImage.name || "score.jpg"}`,
-        "image/jpeg",
-        0.96
+        `preprocessed-${cropBox ? "cropped" : "full"}-${scoreImage.name || "score.png"}`,
+        "image/png",
+        1
       );
 
       return file || scoreImage;
@@ -1362,9 +1362,9 @@ const handleFinalSettlement = async () => {
 
       return canvasToImageFile(
         preprocessedBandCanvas || bandCanvas,
-        `cumulative-score-band-${scoreImage.name || "score.jpg"}`,
-        "image/jpeg",
-        0.97
+        `cumulative-score-band-${scoreImage.name || "score.png"}`,
+        "image/png",
+        1
       );
     } finally {
       URL.revokeObjectURL(imageUrl);
@@ -1427,9 +1427,9 @@ const handleFinalSettlement = async () => {
         });
         const file = await canvasToImageFile(
           preprocessedFrameCanvas || frameCanvas,
-          `frame-${String(index + 1).padStart(2, "0")}-preprocessed.jpg`,
-          "image/jpeg",
-          0.96
+          `frame-${String(index + 1).padStart(2, "0")}-preprocessed.png`,
+          "image/png",
+          1
         );
 
         if (file) {

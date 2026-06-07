@@ -41,28 +41,30 @@ export default function OCRModal({
               <button type="button" onClick={resetCropSelection}>전체로 분석</button>
             </div>
 
-            <div
-              className={cropMode ? "cropImageWrap selecting" : "cropImageWrap"}
-              onMouseDown={startCropSelection}
-              onMouseMove={moveCropSelection}
-              onMouseUp={endCropSelection}
-              onMouseLeave={endCropSelection}
-              onTouchStart={startCropSelection}
-              onTouchMove={moveCropSelection}
-              onTouchEnd={endCropSelection}
-            >
-              <img className="scoreImagePreview" src={scoreImagePreviewUrl} alt="점수판 미리보기" draggable={false} />
-              {currentCropBox && (
-                <div
-                  className="cropSelectionBox"
-                  style={{
-                    left: `${currentCropBox.x * 100}%`,
-                    top: `${currentCropBox.y * 100}%`,
-                    width: `${currentCropBox.width * 100}%`,
-                    height: `${currentCropBox.height * 100}%`,
-                  }}
-                />
-              )}
+            <div className={cropMode ? "cropImageWrap selecting" : "cropImageWrap"}>
+              <div
+                className="cropImageStage"
+                onMouseDown={startCropSelection}
+                onMouseMove={moveCropSelection}
+                onMouseUp={endCropSelection}
+                onMouseLeave={endCropSelection}
+                onTouchStart={startCropSelection}
+                onTouchMove={moveCropSelection}
+                onTouchEnd={endCropSelection}
+              >
+                <img className="scoreImagePreview" src={scoreImagePreviewUrl} alt="점수판 미리보기" draggable={false} />
+                {currentCropBox && (
+                  <div
+                    className="cropSelectionBox"
+                    style={{
+                      left: `${currentCropBox.x * 100}%`,
+                      top: `${currentCropBox.y * 100}%`,
+                      width: `${currentCropBox.width * 100}%`,
+                      height: `${currentCropBox.height * 100}%`,
+                    }}
+                  />
+                )}
+              </div>
             </div>
 
             <div className="ocrShootGuide">
