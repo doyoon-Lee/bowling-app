@@ -31,6 +31,7 @@ import { canvasToImageFile, preprocessScoreCanvas } from "./utils/imagePreproces
 import { cropCanvasByBox, detectScoreFrameBoxes } from "./utils/frameDetection";
 import { analyzeFramesWithTesseract } from "./utils/tesseractOcr";
 import { getOcrMergeSummary, mergeGeminiAndTesseractFrames } from "./utils/ocrMerge";
+import { buildGeminiBowlingOcrPrompt } from "./utils/ocr/geminiPrompt";
 import { getCachedSupabaseClient, getSupabaseClient } from "./utils/supabaseClient";
 
 const BOWLING_RECORD_CACHE_PREFIX = "bowling_records_cache_v1";
@@ -1511,6 +1512,21 @@ const handleFinalSettlement = async () => {
       formData.append("frame_count", String(frameImages.length));
       formData.append("preprocess_applied", "grayscale_contrast_sharpen_frame_boundary_detection_tesseract_compare");
       formData.append("frame_detection", frameImages[0]?.detectionMethod || "none");
+      formData.append("prompt_version", "bowling-ocr-v6");
+      formData.append(
+        "analysis_prompt",
+        buildGeminiBowlingOcrPrompt({
+          previousResult:
+            ocrPreviewRolls.length > 0 || geminiPreviewFrames.length > 0
+              ? {
+                  rolls: ocrPreviewRolls,
+                  frames: geminiPreviewFrames,
+                  note: "사용자가 기존 분석 결과가 실제 사진과 다르다고 판단하여 재분석을 요청했습니다.",
+                }
+              : null,
+          retryAttempt: analysisAttempt + 1,
+        })
+      );
       if (tesseractFrames.length > 0) {
         formData.append("tesseract_result_json", JSON.stringify(tesseractFrames));
       }
