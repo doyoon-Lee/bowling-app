@@ -75,7 +75,6 @@ export default function OCRModal({
                 <li>1~10프레임과 최종 점수가 같이 보이게 해주세요.</li>
                 <li>반사광을 피하고 최대한 정면에서 촬영해주세요.</li>
               </ul>
-              <p>프레임 분리, 전처리, Gemini/Tesseract 비교, 점수 검산은 내부적으로 자동 처리됩니다.</p>
             </div>
           </div>
         )}

@@ -1779,7 +1779,7 @@ const handleFinalSettlement = async () => {
       setOcrReviewFrames(bestResult.reviewFrames);
       setOcrRawText(`한 줄 전체 분석과 프레임 분석을 병합했습니다. ${getOcrReviewSummary(bestResult.reviewFrames)} ${bestResult.data.notes || `confidence: ${bestResult.data.confidence ?? "정보 없음"}`}`);
       setAnalysisAttempt((prev) => prev + 1);
-      setCameraMessage(bestResult.needsRetry ? getOcrFailureGuide(bestResult.advancedResult) : "사진 분석과 자동 검산이 완료되었습니다.");
+      setCameraMessage(bestResult.needsRetry ? getOcrFailureGuide(bestResult.advancedResult) : "사진 분석이 완료되었습니다.");
     } catch (error) {
       console.error("Gemini Analyze Error:", error);
       setCameraMessage(`사진 분석 중 오류 발생: ${error?.message || "알 수 없는 오류"}`);
