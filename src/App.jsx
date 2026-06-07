@@ -27,6 +27,7 @@ import { APP_LOGGED_OUT_KEY, createGuestName, getDisplayUserName, getUserEmail, 
 import { createRoom, findRoomByCode, findRoomById, joinRoomById, upsertRoomScore, deleteRoomPlayerScore, saveRoomGameRound, fetchRoomGameRounds, clearRoomScores, leaveRoomById } from "./utils/room";
 import { createBetRule, calculateBetSettlement, summarizeBetSettlement, ensureBetRule } from "./utils/betting";
 import { groupRecordsByDate } from "./utils/date";
+import { canvasToImageFile, preprocessScoreCanvas } from "./utils/imagePreprocess";
 import { getCachedSupabaseClient, getSupabaseClient } from "./utils/supabaseClient";
 
 const BOWLING_RECORD_CACHE_PREFIX = "bowling_records_cache_v1";
@@ -1260,12 +1261,19 @@ const handleFinalSettlement = async () => {
         sourceHeight
       );
 
-      const blob = await new Promise((resolve) => {
-        canvas.toBlob((nextBlob) => resolve(nextBlob), "image/jpeg", 0.95);
+      const preprocessedCanvas = preprocessScoreCanvas(canvas, {
+        minWidth: 1400,
+        maxWidth: 2400,
+        paddingRatio: 0.025,
       });
+      const file = await canvasToImageFile(
+        preprocessedCanvas || canvas,
+        `preprocessed-${cropBox ? "cropped" : "full"}-${scoreImage.name || "score.jpg"}`,
+        "image/jpeg",
+        0.96
+      );
 
-      if (!blob) return scoreImage;
-      return new File([blob], `cropped-${scoreImage.name || "score.jpg"}`, { type: "image/jpeg" });
+      return file || scoreImage;
     } finally {
       URL.revokeObjectURL(imageUrl);
     }
@@ -1339,16 +1347,24 @@ const handleFinalSettlement = async () => {
           sourceHeight
         );
 
-        const blob = await new Promise((resolve) => {
-          frameCanvas.toBlob((nextBlob) => resolve(nextBlob), "image/jpeg", 0.95);
+        const preprocessedFrameCanvas = preprocessScoreCanvas(frameCanvas, {
+          minWidth: index === 9 ? 360 : 260,
+          maxWidth: index === 9 ? 720 : 520,
+          paddingRatio: 0.04,
         });
+        const file = await canvasToImageFile(
+          preprocessedFrameCanvas || frameCanvas,
+          `frame-${String(index + 1).padStart(2, "0")}-preprocessed.jpg`,
+          "image/jpeg",
+          0.96
+        );
 
-        if (blob) {
+        if (file) {
           frameImages.push({
             frame: index + 1,
-            file: new File([blob], `frame-${String(index + 1).padStart(2, "0")}.jpg`, { type: "image/jpeg" }),
+            file,
           });
-          previewUrls.push({ frame: index + 1, url: URL.createObjectURL(blob) });
+          previewUrls.push({ frame: index + 1, url: URL.createObjectURL(file) });
         }
 
         offsetX += cropWidth;
@@ -1497,7 +1513,7 @@ const handleFinalSettlement = async () => {
     }
 
     setIsAnalyzingScoreImage(true);
-    setCameraMessage("Gemini가 점수판 사진을 분석 중입니다...");
+    setCameraMessage("사진을 OCR용으로 보정한 뒤 Gemini가 분석 중입니다...");
 
     try {
       const formData = new FormData();
@@ -1507,6 +1523,7 @@ const handleFinalSettlement = async () => {
       formData.append("is_cropped_score_row", cropBox ? "true" : "false");
       formData.append("ocr_mode", frameImages.length === 10 ? "frame_based" : "single_image");
       formData.append("frame_count", String(frameImages.length));
+      formData.append("preprocess_applied", "grayscale_contrast_sharpen");
       frameImages.forEach(({ frame, file }) => {
         formData.append("frame_images", file, file.name);
         formData.append("frame_numbers", String(frame));
@@ -1593,7 +1610,7 @@ const handleFinalSettlement = async () => {
       setGeminiPreviewFrames(previewFrames);
       setOcrRawText(data.notes || `confidence: ${data.confidence ?? "정보 없음"}`);
       setAnalysisAttempt((prev) => prev + 1);
-      setCameraMessage("Gemini 분석 결과를 확인한 뒤 맞으면 적용해주세요.");
+      setCameraMessage("전처리 + Gemini 분석 결과를 확인한 뒤 맞으면 적용해주세요.");
     } catch (error) {
       console.error("Gemini Analyze Error:", error);
       setCameraMessage(`사진 분석 중 오류 발생: ${error?.message || "알 수 없는 오류"}`);
