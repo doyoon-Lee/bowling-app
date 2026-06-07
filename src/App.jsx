@@ -30,7 +30,7 @@ import { cropCanvasByBox, detectScoreFrameBoxes } from "./utils/frameDetection";
 import { analyzeCumulativeScoresWithTesseract } from "./utils/tesseractOcr";
 import { buildOcrReviewFrames, getOcrReviewSummary } from "./utils/ocrReview";
 import { buildAdvancedOcrResult, getOcrFailureGuide } from "./utils/ocrAccuracy";
-import { buildGeminiBowlingOcrPrompt, buildGeminiBowlingResponseSchema } from "./utils/ocr/geminiPrompt";
+import { buildGeminiBowlingOcrPrompt } from "./utils/ocr/geminiPrompt";
 import { getCachedSupabaseClient, getSupabaseClient } from "./utils/supabaseClient";
 
 const BOWLING_RECORD_CACHE_PREFIX = "bowling_records_cache_v1";
@@ -1548,8 +1548,6 @@ const handleFinalSettlement = async () => {
           })
         );
 
-        formData.append("response_schema_json", JSON.stringify(buildGeminiBowlingResponseSchema()));
-
         if (tesseractCumulativeResult?.scores?.length > 0) {
           formData.append("tesseract_cumulative_json", JSON.stringify(tesseractCumulativeResult));
         }
@@ -1610,10 +1608,21 @@ const handleFinalSettlement = async () => {
           return;
         }
 
-        if (!data || !Array.isArray(data.rolls)) {
+        if (!data) {
+          setCameraMessage("Gemini 응답이 비어 있습니다. 사진을 더 정면에서 다시 찍어주세요.");
+          return;
+        }
+
+        const parsedRolls = Array.isArray(data.rolls)
+          ? data.rolls
+          : normalizeGeminiRollsFromFrames(Array.isArray(data.frames) ? data.frames : [], []);
+
+        if (!Array.isArray(parsedRolls)) {
           setCameraMessage(`Gemini 응답 형식이 올바르지 않습니다: ${JSON.stringify(data)}`);
           return;
         }
+
+        data.rolls = parsedRolls;
 
         if (data.rolls.length === 0) {
           setCameraMessage(data.notes || "점수판을 인식하지 못했습니다. 사진을 더 정면에서 다시 찍어주세요.");

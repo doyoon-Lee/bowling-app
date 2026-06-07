@@ -83,6 +83,7 @@ previous_result_json이 존재하면 이전 분석 결과가 틀렸을 가능성
 
 반환 형식:
 {
+  "rolls": ["X", "9", "/", "8", "1"],
   "frames": [
     {
       "frame": 1,
@@ -90,34 +91,16 @@ previous_result_json이 존재하면 이전 분석 결과가 틀렸을 가능성
       "confidence": 0.98
     }
   ],
-  "cumulativeScores": [20, 40, 56],
+  "cumulativeScores": [20, 40, 56, 76, 106, 134, 153, 162, 192, 222],
   "finalScore": 222,
+  "confidence": 0.92,
   "notes": "10프레임 재검토"
-}`;
 }
 
-export function buildGeminiBowlingResponseSchema() {
-  return {
-    type: "object",
-    properties: {
-      frames: {
-        type: "array",
-        items: {
-          type: "object",
-          properties: {
-            frame: { type: "integer" },
-            rolls: { type: "array", items: { type: "string" } },
-            mark: { type: "string" },
-            confidence: { type: "number" },
-          },
-          required: ["frame", "rolls", "confidence"],
-        },
-      },
-      cumulativeScores: { type: "array", items: { type: "integer" } },
-      finalScore: { type: "integer" },
-      confidence: { type: "number" },
-      notes: { type: "string" },
-    },
-    required: ["frames", "cumulativeScores", "finalScore"],
-  };
+중요 반환 규칙:
+- rolls는 전체 게임 투구값을 순서대로 펼친 배열이다.
+- frames는 1~10프레임별 투구값 배열이다.
+- rolls와 frames가 서로 모순되면 cumulativeScores와 finalScore에 맞는 값을 선택한다.
+- null을 사용해야 할 경우 rolls에는 넣지 말고 해당 frame.rolls에만 null을 사용한다.
+- JSON 객체 외의 텍스트를 절대 출력하지 않는다.`;
 }
