@@ -1235,7 +1235,7 @@ const handleFinalSettlement = async () => {
   const resetCropSelection = () => {
     setCropBox(null);
     setCropDrag(null);
-    setCropMode(false);
+    setCropMode(true);
   };
 
   const createCroppedScoreImageFile = async () => {
@@ -1467,7 +1467,7 @@ const handleFinalSettlement = async () => {
 
     setScoreImage(file);
     setScoreImagePreviewUrl(URL.createObjectURL(file));
-    setCropMode(false);
+    setCropMode(true);
     setCropBox(null);
     setCropDrag(null);
     setCameraMessage("");

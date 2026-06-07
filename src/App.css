@@ -3591,3 +3591,13 @@ body {
 .frameMark .splitRollMark {
   font-size: 12px;
 }
+
+.cropToolbarText {
+  display: flex;
+  align-items: center;
+  min-height: 32px;
+  color: #0369a1;
+  font-size: 12px;
+  font-weight: 800;
+  line-height: 1.35;
+}

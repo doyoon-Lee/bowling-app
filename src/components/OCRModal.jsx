@@ -8,7 +8,6 @@ export default function OCRModal({
   cropMode,
   cropBox,
   currentCropBox,
-  setCropMode,
   resetCropSelection,
   startCropSelection,
   moveCropSelection,
@@ -37,11 +36,9 @@ export default function OCRModal({
 
         {scoreImage && (
           <div className="cropPanel">
-            <div className="cropToolbar">
-              <button type="button" onClick={() => setCropMode((prev) => !prev)}>
-                {cropMode ? "영역 선택 끄기" : "내 점수 영역 선택"}
-              </button>
-              <button type="button" onClick={resetCropSelection}>전체</button>
+            <div className="cropToolbar compactCropToolbar">
+              <span className="cropToolbarText">사진 위에서 내 점수 한 줄을 바로 드래그하세요.</span>
+              <button type="button" onClick={resetCropSelection}>전체로 분석</button>
             </div>
 
             <div
