@@ -1499,135 +1499,184 @@ const handleFinalSettlement = async () => {
       return;
     }
 
+    const hasBlockingOcrIssue = (reviewFrames = []) =>
+      reviewFrames.some((frame) => {
+        const reasons = Array.isArray(frame.reasons) ? frame.reasons.join(" ") : "";
+        return (
+          Number(frame.confidence) < 0.55 ||
+          reasons.includes("최종점수") ||
+          reasons.includes("누적점수") ||
+          reasons.includes("10프레임") ||
+          reasons.includes("인식 불확실")
+        );
+      });
+
     setIsAnalyzingScoreImage(true);
-    setCameraMessage("사진을 OCR용으로 보정한 뒤 Gemini가 분석 중입니다...");
+    setCameraMessage("사진을 보정하고 자동 검산 중입니다...");
 
     try {
-      const formData = new FormData();
       const imageForAnalysis = await createCroppedScoreImageFile();
       const frameImages = await createFrameBasedScoreImages();
       const tesseractFrames = frameImages.length === 10 ? await analyzeFramesWithTesseract(frameImages) : [];
-      formData.append("image", imageForAnalysis);
-      formData.append("is_cropped_score_row", cropBox ? "true" : "false");
-      formData.append("ocr_mode", frameImages.length === 10 ? "frame_based" : "single_image");
-      formData.append("frame_count", String(frameImages.length));
-      formData.append("preprocess_applied", "grayscale_contrast_sharpen_frame_boundary_detection_tesseract_compare");
-      formData.append("frame_detection", frameImages[0]?.detectionMethod || "none");
-      formData.append("prompt_version", "bowling-ocr-v6");
-      formData.append(
-        "analysis_prompt",
-        buildGeminiBowlingOcrPrompt({
-          previousResult:
-            ocrPreviewRolls.length > 0 || geminiPreviewFrames.length > 0
-              ? {
-                  rolls: ocrPreviewRolls,
-                  frames: geminiPreviewFrames,
-                  note: "사용자가 기존 분석 결과가 실제 사진과 다르다고 판단하여 재분석을 요청했습니다.",
-                }
-              : null,
-          retryAttempt: analysisAttempt + 1,
-        })
-      );
-      if (tesseractFrames.length > 0) {
-        formData.append("tesseract_result_json", JSON.stringify(tesseractFrames));
-      }
-      frameImages.forEach(({ frame, file }) => {
-        formData.append("frame_images", file, file.name);
-        formData.append("frame_numbers", String(frame));
-      });
+      const maxAttempts = 3;
+      let bestResult = null;
+      let previousResultForRetry =
+        ocrPreviewRolls.length > 0 || geminiPreviewFrames.length > 0
+          ? {
+              rolls: ocrPreviewRolls,
+              frames: geminiPreviewFrames,
+              note: "사용자가 기존 분석 결과가 실제 사진과 다르다고 판단하여 재분석을 요청했습니다.",
+            }
+          : null;
 
-      if (ocrPreviewRolls.length > 0 || geminiPreviewFrames.length > 0) {
+      for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
+        setCameraMessage(attempt === 1 ? "사진을 분석 중입니다..." : `자동 검산 재분석 중입니다... (${attempt}/${maxAttempts})`);
+
+        const formData = new FormData();
+        formData.append("image", imageForAnalysis);
+        formData.append("is_cropped_score_row", cropBox ? "true" : "false");
+        formData.append("ocr_mode", frameImages.length === 10 ? "frame_based" : "single_image");
+        formData.append("frame_count", String(frameImages.length));
+        formData.append("preprocess_applied", "grayscale_contrast_sharpen_frame_boundary_detection_tesseract_compare_auto_retry");
+        formData.append("frame_detection", frameImages[0]?.detectionMethod || "none");
+        formData.append("prompt_version", "bowling-ocr-v7-auto-retry");
         formData.append(
-          "previous_result_json",
-          JSON.stringify({
-            rolls: ocrPreviewRolls,
-            frames: geminiPreviewFrames,
-            note: "사용자가 기존 분석 결과가 실제 사진과 다르다고 판단하여 재분석을 요청했습니다. 이전 결과를 그대로 반복하지 말고 사진을 다시 검토하세요.",
+          "analysis_prompt",
+          buildGeminiBowlingOcrPrompt({
+            previousResult: previousResultForRetry,
+            retryAttempt: analysisAttempt + attempt,
           })
         );
-      }
 
-      formData.append("retry_attempt", String(analysisAttempt + 1));
+        if (tesseractFrames.length > 0) {
+          formData.append("tesseract_result_json", JSON.stringify(tesseractFrames));
+        }
 
-      const response = await fetch(`${url}/functions/v1/parse-bowling-score`, {
-        method: "POST",
-        headers: {
-          apikey: anonKey,
-          Authorization: `Bearer ${session?.access_token || anonKey}`,
-        },
-        body: formData,
-      });
+        frameImages.forEach(({ frame, file }) => {
+          formData.append("frame_images", file, file.name);
+          formData.append("frame_numbers", String(frame));
+        });
 
-      const responseText = await response.text();
-      console.log("Gemini Edge Function Status:", response.status);
-      console.log("Gemini Edge Function Response:", responseText);
+        if (previousResultForRetry) {
+          formData.append(
+            "previous_result_json",
+            JSON.stringify({
+              ...previousResultForRetry,
+              note: "자동 검산에서 불확실성이 감지되었습니다. 이전 결과를 반복하지 말고 프레임 기호, 누적점수, finalScore를 다시 비교하세요.",
+            })
+          );
+        }
 
-      let data = null;
+        formData.append("retry_attempt", String(analysisAttempt + attempt));
 
-      try {
-        data = responseText ? JSON.parse(responseText) : null;
-      } catch {
-        setCameraMessage(`사진 분석 응답 파싱 실패: ${responseText}`);
-        return;
-      }
+        const response = await fetch(`${url}/functions/v1/parse-bowling-score`, {
+          method: "POST",
+          headers: {
+            apikey: anonKey,
+            Authorization: `Bearer ${session?.access_token || anonKey}`,
+          },
+          body: formData,
+        });
 
-      if (!response.ok) {
-        if (response.status === 503) {
-          setCameraMessage("Gemini 서버 사용량이 많습니다. 잠시 후 다시 시도해주세요.");
+        const responseText = await response.text();
+        console.log("Gemini Edge Function Status:", response.status);
+        console.log("Gemini Edge Function Response:", responseText);
+
+        let data = null;
+
+        try {
+          data = responseText ? JSON.parse(responseText) : null;
+        } catch {
+          setCameraMessage(`사진 분석 응답 파싱 실패: ${responseText}`);
           return;
         }
 
-        if (response.status === 429) {
-          setCameraMessage("AI 사용량 제한에 도달했습니다. 잠시 후 다시 시도해주세요.");
+        if (!response.ok) {
+          if (response.status === 503) {
+            setCameraMessage("Gemini 서버 사용량이 많습니다. 잠시 후 다시 시도해주세요.");
+            return;
+          }
+
+          if (response.status === 429) {
+            setCameraMessage("AI 사용량 제한에 도달했습니다. 잠시 후 다시 시도해주세요.");
+            return;
+          }
+
+          setCameraMessage(
+            `사진 분석 오류 (${response.status}): ${data?.error || "알 수 없는 오류"}${data?.detail ? ` / ${data.detail}` : ""}`
+          );
           return;
         }
 
-        setCameraMessage(
-          `사진 분석 오류 (${response.status}): ${data?.error || "알 수 없는 오류"}${data?.detail ? ` / ${data.detail}` : ""}`
+        if (!data || !Array.isArray(data.rolls)) {
+          setCameraMessage(`Gemini 응답 형식이 올바르지 않습니다: ${JSON.stringify(data)}`);
+          return;
+        }
+
+        if (data.rolls.length === 0) {
+          setCameraMessage(data.notes || "점수판을 인식하지 못했습니다. 사진을 더 정면에서 다시 찍어주세요.");
+          return;
+        }
+
+        const cumulativeScores = getCumulativeScoresFromData(data);
+        const mergedOcrFrames = mergeGeminiAndTesseractFrames(data.frames, tesseractFrames);
+        const framesForRepair = mergedOcrFrames.length > 0 ? mergedOcrFrames : data.frames;
+        const frameBasedRolls = normalizeGeminiRollsFromFrames(framesForRepair, data.rolls);
+        const scoreCheckedRolls = repairGeminiFramesByCumulativeScores(
+          framesForRepair,
+          frameBasedRolls,
+          cumulativeScores
         );
+        const repairedRolls = repairTenthFrameRolls(
+          scoreCheckedRolls,
+          framesForRepair,
+          data.finalScore,
+          cumulativeScores
+        );
+        const previewFrames = calcBowlingScore(repairedRolls).frames;
+        const reviewFrames = buildOcrReviewFrames({
+          frames: framesForRepair,
+          rolls: repairedRolls,
+          framePreviews: ocrFramePreviews,
+          cumulativeScores,
+          finalScore: data.finalScore,
+        });
+        const needsRetry = hasBlockingOcrIssue(reviewFrames);
+
+        bestResult = {
+          repairedRolls,
+          previewFrames,
+          reviewFrames,
+          framesForRepair,
+          data,
+          needsRetry,
+        };
+
+        if (!needsRetry || attempt === maxAttempts) {
+          break;
+        }
+
+        previousResultForRetry = {
+          rolls: repairedRolls,
+          frames: previewFrames,
+          cumulativeScores,
+          finalScore: data.finalScore,
+          review: reviewFrames.filter((frame) => frame.needsReview),
+          note: "자동 검산에서 불일치가 감지되어 재분석합니다. 누적점수와 finalScore를 우선하여 다시 판단하세요.",
+        };
+      }
+
+      if (!bestResult) {
+        setCameraMessage("사진 분석 결과를 만들지 못했습니다. 다시 시도해주세요.");
         return;
       }
 
-      if (!data || !Array.isArray(data.rolls)) {
-        setCameraMessage(`Gemini 응답 형식이 올바르지 않습니다: ${JSON.stringify(data)}`);
-        return;
-      }
-
-      if (data.rolls.length === 0) {
-        setCameraMessage(data.notes || "점수판을 인식하지 못했습니다. 사진을 더 정면에서 다시 찍어주세요.");
-        return;
-      }
-
-      const cumulativeScores = getCumulativeScoresFromData(data);
-      const mergedOcrFrames = mergeGeminiAndTesseractFrames(data.frames, tesseractFrames);
-      const framesForRepair = mergedOcrFrames.length > 0 ? mergedOcrFrames : data.frames;
-      const frameBasedRolls = normalizeGeminiRollsFromFrames(framesForRepair, data.rolls);
-      const scoreCheckedRolls = repairGeminiFramesByCumulativeScores(
-        framesForRepair,
-        frameBasedRolls,
-        cumulativeScores
-      );
-      const repairedRolls = repairTenthFrameRolls(
-        scoreCheckedRolls,
-        framesForRepair,
-        data.finalScore,
-        cumulativeScores
-      );
-      const previewFrames = calcBowlingScore(repairedRolls).frames;
-      const reviewFrames = buildOcrReviewFrames({
-        frames: framesForRepair,
-        rolls: repairedRolls,
-        framePreviews: ocrFramePreviews,
-        cumulativeScores,
-        finalScore: data.finalScore,
-      });
-
-      setOcrPreviewRolls(repairedRolls);
-      setGeminiPreviewFrames(previewFrames);
-      setOcrReviewFrames(reviewFrames);
-      setOcrRawText(`${getOcrMergeSummary(framesForRepair)} ${getOcrReviewSummary(reviewFrames)} ${data.notes || `confidence: ${data.confidence ?? "정보 없음"}`}`);
+      setOcrPreviewRolls(bestResult.repairedRolls);
+      setGeminiPreviewFrames(bestResult.previewFrames);
+      setOcrReviewFrames(bestResult.reviewFrames);
+      setOcrRawText(`${getOcrMergeSummary(bestResult.framesForRepair)} ${getOcrReviewSummary(bestResult.reviewFrames)} ${bestResult.data.notes || `confidence: ${bestResult.data.confidence ?? "정보 없음"}`}`);
       setAnalysisAttempt((prev) => prev + 1);
-      setCameraMessage("전처리 + Gemini/Tesseract 혼합 분석 결과를 확인한 뒤 맞으면 적용해주세요.");
+      setCameraMessage(bestResult.needsRetry ? "자동 검산을 완료했습니다. 결과가 다르면 사진을 다시 촬영해 분석해주세요." : "사진 분석과 자동 검산이 완료되었습니다.");
     } catch (error) {
       console.error("Gemini Analyze Error:", error);
       setCameraMessage(`사진 분석 중 오류 발생: ${error?.message || "알 수 없는 오류"}`);
@@ -1635,6 +1684,7 @@ const handleFinalSettlement = async () => {
       setIsAnalyzingScoreImage(false);
     }
   };
+
 
   const applyOcrPreview = () => {
     if (!ocrPreviewRolls.length) return;
