@@ -24,6 +24,7 @@ export function buildGeminiBowlingOcrPrompt({ previousResult = null, retryAttemp
 - 위쪽 프레임별 투구 기호
 - 아래쪽 프레임별 누적 점수
 - 오른쪽 또는 하단의 최종 점수(finalScore)
+- 별도 첨부될 수 있는 투구마크 밴드, 누적점수 밴드, 최종점수 밴드, 10프레임 밴드 이미지
 - 스플릿 표시: 첫 투구 숫자 주위에 원, 네모, 색상 강조, 분리 표시가 있으면 해당 프레임을 isSplit으로 표시
 
 허용 문자:
@@ -33,13 +34,14 @@ export function buildGeminiBowlingOcrPrompt({ previousResult = null, retryAttemp
 - 0~9
 
 핵심 분석 순서:
-1. 위쪽 프레임 투구 기호를 읽는다.
-2. 아래쪽 cumulativeScores를 읽는다.
-3. finalScore를 읽는다.
-4. cumulativeScores와 finalScore로 rolls를 반드시 검산한다.
-5. finalScore와 다르면 rolls를 재검토한다.
-6. 특히 10프레임 보너스 투구 누락 여부를 반드시 확인한다.
-7. 4, 6, 8, 9 숫자는 누적 점수 차이로 교차 검증한다.
+1. 전체 행 이미지에서 플레이어 한 줄을 파악한다.
+2. 투구마크 밴드가 있으면 위쪽 프레임 투구 기호는 그 이미지를 우선한다.
+3. 누적점수 밴드가 있으면 cumulativeScores는 그 이미지를 우선한다.
+4. 최종점수 밴드가 있으면 finalScore는 그 이미지를 최우선한다.
+5. cumulativeScores와 finalScore로 rolls를 반드시 검산한다.
+6. finalScore와 다르면 rolls를 재검토한다.
+7. 특히 10프레임 보너스 투구 누락 여부를 반드시 확인한다.
+8. 4, 6, 8, 9 숫자는 누적 점수 차이로 교차 검증한다.
 
 볼링 규칙:
 - frame은 1~10
@@ -89,6 +91,9 @@ previous_result_json이 존재하면 이전 분석 결과가 틀렸을 가능성
 - 1프레임이 9/로 보이고 아래 누적점수가 19이면 1프레임은 9/로 유지한다. -7, 7-, 9-로 바꾸지 않는다.
 - cumulativeScores가 [19,39,59,78,98,117,126,135,163,182]처럼 보이면 첫 2프레임은 9/, 9/ 계열로 검산한다.
 - finalScore에는 마지막에 보이는 최종 점수를 넣는다.
+- 모바일 촬영본에서는 프레임 번호 1~10이 투구 숫자처럼 보일 수 있다. 프레임 번호는 절대 rolls나 cumulativeScores에 넣지 않는다.
+- cumulativeScores 밴드와 finalScore 밴드가 따로 주어지면 전체 행보다 해당 밴드를 더 신뢰한다.
+- finalScore가 182처럼 명확하게 보이는데 rolls 계산값이 105처럼 크게 다르면 105를 반환하지 말고 finalScore와 누적점수에 맞게 rolls를 재구성한다.
 
 반환 형식:
 {

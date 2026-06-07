@@ -28,7 +28,7 @@ import { groupRecordsByDate } from "./utils/date";
 import { canvasToImageFile, preprocessScoreCanvas } from "./utils/imagePreprocess";
 import { isolateScoreRowCanvas } from "./utils/rowIsolation";
 import { cropCanvasByBox, detectScoreFrameBoxes } from "./utils/frameDetection";
-import { analyzeCumulativeScoresWithTesseract } from "./utils/tesseractOcr";
+import { analyzeCumulativeScoresWithTesseract, analyzeFinalScoreWithTesseract } from "./utils/tesseractOcr";
 import { buildOcrReviewFrames, getOcrReviewSummary } from "./utils/ocrReview";
 import { buildAdvancedOcrResult, getOcrFailureGuide } from "./utils/ocrAccuracy";
 import { buildGeminiBowlingOcrPrompt } from "./utils/ocr/geminiPrompt";
@@ -1238,62 +1238,8 @@ const handleFinalSettlement = async () => {
     setCropMode(true);
   };
 
-  const createCroppedScoreImageFile = async () => {
-    if (!scoreImage || !cropBox) return scoreImage;
 
-    const imageUrl = URL.createObjectURL(scoreImage);
-    try {
-      const image = await new Promise((resolve, reject) => {
-        const img = new Image();
-        img.onload = () => resolve(img);
-        img.onerror = reject;
-        img.src = imageUrl;
-      });
-
-      const sourceX = Math.round(image.naturalWidth * cropBox.x);
-      const sourceY = Math.round(image.naturalHeight * cropBox.y);
-      const sourceWidth = Math.round(image.naturalWidth * cropBox.width);
-      const sourceHeight = Math.round(image.naturalHeight * cropBox.height);
-
-      const canvas = document.createElement("canvas");
-      canvas.width = sourceWidth;
-      canvas.height = sourceHeight;
-
-      canvas.getContext("2d").drawImage(
-        image,
-        sourceX,
-        sourceY,
-        sourceWidth,
-        sourceHeight,
-        0,
-        0,
-        sourceWidth,
-        sourceHeight
-      );
-
-      const isolatedRow = isolateScoreRowCanvas(canvas, { force: Boolean(cropBox) });
-      const rowCanvas = isolatedRow.canvas || canvas;
-      const preprocessedCanvas = preprocessScoreCanvas(rowCanvas, {
-        minWidth: 1400,
-        maxWidth: 2400,
-        paddingRatio: 0.025,
-      });
-      const file = await canvasToImageFile(
-        preprocessedCanvas || rowCanvas,
-        `preprocessed-${cropBox ? "cropped" : "full"}-${scoreImage.name || "score.png"}`,
-        "image/png",
-        1
-      );
-
-      return file || scoreImage;
-    } finally {
-      URL.revokeObjectURL(imageUrl);
-    }
-  };
-
-
-
-  const createCumulativeScoreBandImageFile = async () => {
+  const loadScoreImageElement = async () => {
     if (!scoreImage) return null;
 
     const imageUrl = URL.createObjectURL(scoreImage);
@@ -1304,18 +1250,37 @@ const handleFinalSettlement = async () => {
         img.onerror = reject;
         img.src = imageUrl;
       });
+      return { image, imageUrl };
+    } catch (error) {
+      URL.revokeObjectURL(imageUrl);
+      throw error;
+    }
+  };
 
-      const sourceX = cropBox ? Math.round(image.naturalWidth * cropBox.x) : 0;
-      const sourceY = cropBox ? Math.round(image.naturalHeight * cropBox.y) : 0;
-      const sourceWidth = cropBox ? Math.round(image.naturalWidth * cropBox.width) : image.naturalWidth;
-      const sourceHeight = cropBox ? Math.round(image.naturalHeight * cropBox.height) : image.naturalHeight;
+  const getSourceCropRect = (image) => {
+    const sourceX = cropBox ? Math.round(image.naturalWidth * cropBox.x) : 0;
+    const sourceY = cropBox ? Math.round(image.naturalHeight * cropBox.y) : 0;
+    const sourceWidth = cropBox ? Math.round(image.naturalWidth * cropBox.width) : image.naturalWidth;
+    const sourceHeight = cropBox ? Math.round(image.naturalHeight * cropBox.height) : image.naturalHeight;
+    return {
+      sourceX,
+      sourceY,
+      sourceWidth: Math.max(1, sourceWidth),
+      sourceHeight: Math.max(1, sourceHeight),
+    };
+  };
 
-      if (sourceWidth <= 0 || sourceHeight <= 0) return null;
+  const createSourceRowCanvas = async () => {
+    const loaded = await loadScoreImageElement();
+    if (!loaded) return { sourceCanvas: null, rowCanvas: null, imageUrl: null };
 
-      const scoreRowCanvas = document.createElement("canvas");
-      scoreRowCanvas.width = sourceWidth;
-      scoreRowCanvas.height = sourceHeight;
-      scoreRowCanvas.getContext("2d").drawImage(
+    const { image, imageUrl } = loaded;
+    try {
+      const { sourceX, sourceY, sourceWidth, sourceHeight } = getSourceCropRect(image);
+      const sourceCanvas = document.createElement("canvas");
+      sourceCanvas.width = sourceWidth;
+      sourceCanvas.height = sourceHeight;
+      sourceCanvas.getContext("2d").drawImage(
         image,
         sourceX,
         sourceY,
@@ -1327,109 +1292,126 @@ const handleFinalSettlement = async () => {
         sourceHeight
       );
 
-      const isolatedRow = isolateScoreRowCanvas(scoreRowCanvas, { force: Boolean(cropBox) });
-      const targetRowCanvas = isolatedRow.canvas || scoreRowCanvas;
-
-      // Cumulative scores are normally printed on the lower half of the selected
-      // score row. Cropping this band keeps frame numbers and throw marks out of
-      // Tesseract, which prevents cases such as a visible 19 being read as 7 or
-      // the top frame numbers being mixed into the score sequence.
-      const bandY = Math.round(targetRowCanvas.height * 0.46);
-      const bandHeight = Math.max(1, Math.round(targetRowCanvas.height * 0.5));
-      const bandCanvas = document.createElement("canvas");
-      bandCanvas.width = targetRowCanvas.width;
-      bandCanvas.height = bandHeight;
-      const bandCtx = bandCanvas.getContext("2d");
-      bandCtx.fillStyle = "#ffffff";
-      bandCtx.fillRect(0, 0, bandCanvas.width, bandCanvas.height);
-      bandCtx.drawImage(
-        targetRowCanvas,
-        0,
-        bandY,
-        targetRowCanvas.width,
-        Math.min(bandHeight, targetRowCanvas.height - bandY),
-        0,
-        0,
-        targetRowCanvas.width,
-        Math.min(bandHeight, targetRowCanvas.height - bandY)
-      );
-
-      const preprocessedBandCanvas = preprocessScoreCanvas(bandCanvas, {
-        minWidth: 1500,
-        maxWidth: 2600,
-        paddingRatio: 0.04,
-      });
-
-      return canvasToImageFile(
-        preprocessedBandCanvas || bandCanvas,
-        `cumulative-score-band-${scoreImage.name || "score.png"}`,
-        "image/png",
-        1
-      );
-    } finally {
+      const isolatedRow = isolateScoreRowCanvas(sourceCanvas, { force: Boolean(cropBox) });
+      return { sourceCanvas, rowCanvas: isolatedRow.canvas || sourceCanvas, rowIsolation: isolatedRow, imageUrl };
+    } catch (error) {
       URL.revokeObjectURL(imageUrl);
+      throw error;
     }
+  };
+
+  const cropRelativeBandCanvas = (sourceCanvas, { x = 0, y = 0, width = 1, height = 1 } = {}) => {
+    if (!sourceCanvas?.width || !sourceCanvas?.height) return null;
+    const sx = Math.max(0, Math.min(sourceCanvas.width - 1, Math.round(sourceCanvas.width * x)));
+    const sy = Math.max(0, Math.min(sourceCanvas.height - 1, Math.round(sourceCanvas.height * y)));
+    const sw = Math.max(1, Math.min(sourceCanvas.width - sx, Math.round(sourceCanvas.width * width)));
+    const sh = Math.max(1, Math.min(sourceCanvas.height - sy, Math.round(sourceCanvas.height * height)));
+    const canvas = document.createElement("canvas");
+    canvas.width = sw;
+    canvas.height = sh;
+    const ctx = canvas.getContext("2d");
+    ctx.fillStyle = "#ffffff";
+    ctx.fillRect(0, 0, sw, sh);
+    ctx.drawImage(sourceCanvas, sx, sy, sw, sh, 0, 0, sw, sh);
+    return canvas;
+  };
+
+  const makeOcrFile = async (canvas, filename, options = {}) => {
+    if (!canvas) return null;
+    const preprocessedCanvas = preprocessScoreCanvas(canvas, {
+      minWidth: options.minWidth || 1500,
+      maxWidth: options.maxWidth || 2800,
+      paddingRatio: options.paddingRatio ?? 0.035,
+      threshold: Boolean(options.threshold),
+      invert: Boolean(options.invert),
+      contrast: options.contrast || 1.55,
+      brightness: options.brightness ?? 12,
+    });
+    return canvasToImageFile(preprocessedCanvas || canvas, filename, "image/png", 1);
+  };
+
+  const createCroppedScoreImageFile = async () => {
+    if (!scoreImage) return null;
+
+    const { rowCanvas, imageUrl } = await createSourceRowCanvas();
+    try {
+      const file = await makeOcrFile(
+        rowCanvas,
+        `preprocessed-${cropBox ? "cropped" : "full"}-${scoreImage.name || "score.png"}`,
+        { minWidth: 1600, maxWidth: 2800, paddingRatio: 0.025, contrast: 1.55 }
+      );
+      return file || scoreImage;
+    } finally {
+      if (imageUrl) URL.revokeObjectURL(imageUrl);
+    }
+  };
+
+
+
+
+  const createOcrBandImageFiles = async () => {
+    if (!scoreImage) return { cumulativeFiles: [], markFile: null, finalScoreFile: null, tenthFrameFile: null };
+
+    const { rowCanvas, imageUrl } = await createSourceRowCanvas();
+    try {
+      if (!rowCanvas?.width || !rowCanvas?.height) return { cumulativeFiles: [], markFile: null, finalScoreFile: null, tenthFrameFile: null };
+
+      // 모바일 촬영본은 프레임 번호/투구/누적점수가 붙어 있어 한 번에 OCR하면 숫자가 섞인다.
+      // 그래서 같은 선택 영역을 내부적으로 4개 밴드로 다시 나눠 보낸다.
+      const markCanvas = cropRelativeBandCanvas(rowCanvas, { x: 0, y: 0.08, width: 1, height: 0.46 });
+      const cumulativeCanvas = cropRelativeBandCanvas(rowCanvas, { x: 0, y: 0.44, width: 1, height: 0.48 });
+      const cumulativeTightCanvas = cropRelativeBandCanvas(rowCanvas, { x: 0.02, y: 0.52, width: 0.94, height: 0.34 });
+      const finalScoreCanvas = cropRelativeBandCanvas(rowCanvas, { x: 0.83, y: 0.24, width: 0.17, height: 0.68 });
+      const tenthFrameCanvas = cropRelativeBandCanvas(rowCanvas, { x: 0.83, y: 0.06, width: 0.17, height: 0.86 });
+
+      const [markFile, cumulativeFile, cumulativeTightFile, cumulativeInvertedFile, finalScoreFile, tenthFrameFile] = await Promise.all([
+        makeOcrFile(markCanvas, `throw-mark-band-${scoreImage.name || "score.png"}`, { minWidth: 1500, maxWidth: 2800, paddingRatio: 0.035, contrast: 1.5 }),
+        makeOcrFile(cumulativeCanvas, `cumulative-score-band-${scoreImage.name || "score.png"}`, { minWidth: 1800, maxWidth: 3200, paddingRatio: 0.045, contrast: 1.75 }),
+        makeOcrFile(cumulativeTightCanvas, `cumulative-score-tight-band-${scoreImage.name || "score.png"}`, { minWidth: 1800, maxWidth: 3200, paddingRatio: 0.06, contrast: 1.9 }),
+        makeOcrFile(cumulativeTightCanvas, `cumulative-score-inverted-band-${scoreImage.name || "score.png"}`, { minWidth: 1800, maxWidth: 3200, paddingRatio: 0.06, contrast: 1.9, invert: true }),
+        makeOcrFile(finalScoreCanvas, `final-score-band-${scoreImage.name || "score.png"}`, { minWidth: 700, maxWidth: 1400, paddingRatio: 0.08, contrast: 1.9 }),
+        makeOcrFile(tenthFrameCanvas, `tenth-frame-band-${scoreImage.name || "score.png"}`, { minWidth: 700, maxWidth: 1400, paddingRatio: 0.08, contrast: 1.7 }),
+      ]);
+
+      return {
+        cumulativeFiles: [cumulativeFile, cumulativeTightFile, cumulativeInvertedFile].filter(Boolean),
+        markFile,
+        finalScoreFile,
+        tenthFrameFile,
+      };
+    } finally {
+      if (imageUrl) URL.revokeObjectURL(imageUrl);
+    }
+  };
+
+  const createCumulativeScoreBandImageFile = async () => {
+    const bands = await createOcrBandImageFiles();
+    return bands.cumulativeFiles?.[0] || null;
   };
 
 
   const createFrameBasedScoreImages = async () => {
     if (!scoreImage) return [];
 
-    const imageUrl = URL.createObjectURL(scoreImage);
+    const { rowCanvas, imageUrl } = await createSourceRowCanvas();
     try {
-      const image = await new Promise((resolve, reject) => {
-        const img = new Image();
-        img.onload = () => resolve(img);
-        img.onerror = reject;
-        img.src = imageUrl;
-      });
-
-      const sourceX = cropBox ? Math.round(image.naturalWidth * cropBox.x) : 0;
-      const sourceY = cropBox ? Math.round(image.naturalHeight * cropBox.y) : 0;
-      const sourceWidth = cropBox ? Math.round(image.naturalWidth * cropBox.width) : image.naturalWidth;
-      const sourceHeight = cropBox ? Math.round(image.naturalHeight * cropBox.height) : image.naturalHeight;
-
-      if (sourceWidth <= 0 || sourceHeight <= 0) return [];
-
-      const scoreRowCanvas = document.createElement("canvas");
-      scoreRowCanvas.width = sourceWidth;
-      scoreRowCanvas.height = sourceHeight;
-      scoreRowCanvas.getContext("2d").drawImage(
-        image,
-        sourceX,
-        sourceY,
-        sourceWidth,
-        sourceHeight,
-        0,
-        0,
-        sourceWidth,
-        sourceHeight
-      );
-
-      const isolatedRow = isolateScoreRowCanvas(scoreRowCanvas, { force: Boolean(cropBox) });
-      const targetRowCanvas = isolatedRow.canvas || scoreRowCanvas;
-      const detectedFrameBoxes = detectScoreFrameBoxes(targetRowCanvas);
+      if (!rowCanvas?.width || !rowCanvas?.height) return [];
+      const detectedFrameBoxes = detectScoreFrameBoxes(rowCanvas);
 
       const frameImages = [];
       const previewUrls = [];
 
       for (let index = 0; index < detectedFrameBoxes.length; index += 1) {
         const box = detectedFrameBoxes[index];
-        const frameCanvas = cropCanvasByBox(targetRowCanvas, box, {
+        const frameCanvas = cropCanvasByBox(rowCanvas, box, {
           paddingXRatio: index === 9 ? 0.045 : 0.06,
           paddingYRatio: 0.08,
         });
 
-        const preprocessedFrameCanvas = preprocessScoreCanvas(frameCanvas, {
-          minWidth: index === 9 ? 360 : 260,
-          maxWidth: index === 9 ? 720 : 520,
-          paddingRatio: 0.04,
-        });
-        const file = await canvasToImageFile(
-          preprocessedFrameCanvas || frameCanvas,
+        const file = await makeOcrFile(
+          frameCanvas,
           `frame-${String(index + 1).padStart(2, "0")}-preprocessed.png`,
-          "image/png",
-          1
+          { minWidth: index === 9 ? 420 : 300, maxWidth: index === 9 ? 820 : 580, paddingRatio: 0.04, contrast: 1.6 }
         );
 
         if (file) {
@@ -1453,9 +1435,10 @@ const handleFinalSettlement = async () => {
 
       return frameImages;
     } finally {
-      URL.revokeObjectURL(imageUrl);
+      if (imageUrl) URL.revokeObjectURL(imageUrl);
     }
   };
+
 
   const currentCropBox = cropDrag ? normalizeCropBox(cropDrag.start, cropDrag.current) : cropBox;
 
@@ -1499,6 +1482,27 @@ const handleFinalSettlement = async () => {
       : [];
 
     return fromFrames.slice(0, 10);
+  };
+
+  const scoreTesseractCumulativeResult = (result = {}) => {
+    const scores = Array.isArray(result.scores) ? result.scores.map(Number).filter(Number.isFinite) : [];
+    let score = scores.length * 100 + Number(result.confidence || 0);
+    if (scores.length === 10) score += 450;
+    for (let index = 1; index < scores.length; index += 1) {
+      const delta = scores[index] - scores[index - 1];
+      if (delta < 0 || delta > 30) score -= 260;
+      else score += 25;
+    }
+    if (scores[0] > 30) score -= 180;
+    const last = scores[scores.length - 1];
+    if (last >= 100 && last <= 300) score += 90;
+    return score;
+  };
+
+  const pickBestTesseractCumulativeResult = (results = []) => {
+    const validResults = results.filter((result) => Array.isArray(result?.scores) && result.scores.length > 0);
+    if (validResults.length === 0) return { scores: [], rawText: "", confidence: 0 };
+    return validResults.slice().sort((a, b) => scoreTesseractCumulativeResult(b) - scoreTesseractCumulativeResult(a))[0];
   };
 
   const repairGeminiFramesByCumulativeScores = (frames, fallbackRolls = [], cumulativeScores = []) => {
@@ -1606,9 +1610,13 @@ const handleFinalSettlement = async () => {
 
     try {
       const imageForAnalysis = await createCroppedScoreImageFile();
-      const cumulativeScoreBandImage = await createCumulativeScoreBandImageFile();
+      const ocrBandImages = await createOcrBandImageFiles();
+      const cumulativeScoreBandImage = ocrBandImages.cumulativeFiles?.[0] || null;
       const frameImages = await createFrameBasedScoreImages();
-      const tesseractCumulativeResult = await analyzeCumulativeScoresWithTesseract(cumulativeScoreBandImage || imageForAnalysis);
+      const cumulativeOcrInputs = (ocrBandImages.cumulativeFiles?.length ? ocrBandImages.cumulativeFiles : [cumulativeScoreBandImage || imageForAnalysis]).filter(Boolean);
+      const cumulativeOcrResults = await Promise.all(cumulativeOcrInputs.map((file) => analyzeCumulativeScoresWithTesseract(file)));
+      const tesseractCumulativeResult = pickBestTesseractCumulativeResult(cumulativeOcrResults);
+      const tesseractFinalScoreResult = await analyzeFinalScoreWithTesseract(ocrBandImages.finalScoreFile || ocrBandImages.tenthFrameFile);
       const maxAttempts = 3;
       let bestResult = null;
       let previousResultForRetry =
@@ -1628,10 +1636,10 @@ const handleFinalSettlement = async () => {
         formData.append("is_cropped_score_row", cropBox ? "true" : "false");
         formData.append("ocr_mode", frameImages.length === 10 ? "hybrid_row_and_frame" : "single_image");
         formData.append("frame_count", String(frameImages.length));
-        formData.append("preprocess_applied", "grayscale_contrast_sharpen_frame_boundary_detection_row_frame_merge_tesseract_cumulative_score_band_auto_retry");
+        formData.append("preprocess_applied", "mobile_original_resolution_bands_mark_cumulative_final_tenth_solver");
         formData.append("frame_detection", frameImages[0]?.detectionMethod || "none");
         formData.append("row_isolation", "enabled");
-        formData.append("prompt_version", "bowling-ocr-v9-row-isolation-x-finalscore");
+        formData.append("prompt_version", "bowling-ocr-v10-mobile-band-finalscore");
         formData.append(
           "analysis_prompt",
           buildGeminiBowlingOcrPrompt({
@@ -1644,8 +1652,28 @@ const handleFinalSettlement = async () => {
           formData.append("tesseract_cumulative_json", JSON.stringify(tesseractCumulativeResult));
         }
 
+        if (tesseractFinalScoreResult?.score !== null && tesseractFinalScoreResult?.score !== undefined) {
+          formData.append("tesseract_final_score_json", JSON.stringify(tesseractFinalScoreResult));
+        }
+
         if (cumulativeScoreBandImage) {
-          formData.append("cumulative_score_band_image", cumulativeScoreBandImage, cumulativeScoreBandImage.name || "cumulative-score-band.jpg");
+          formData.append("cumulative_score_band_image", cumulativeScoreBandImage, cumulativeScoreBandImage.name || "cumulative-score-band.png");
+        }
+
+        (ocrBandImages.cumulativeFiles || []).forEach((file, index) => {
+          formData.append("cumulative_score_band_images", file, file.name || `cumulative-score-band-${index + 1}.png`);
+        });
+
+        if (ocrBandImages.markFile) {
+          formData.append("throw_mark_band_image", ocrBandImages.markFile, ocrBandImages.markFile.name || "throw-mark-band.png");
+        }
+
+        if (ocrBandImages.finalScoreFile) {
+          formData.append("final_score_band_image", ocrBandImages.finalScoreFile, ocrBandImages.finalScoreFile.name || "final-score-band.png");
+        }
+
+        if (ocrBandImages.tenthFrameFile) {
+          formData.append("tenth_frame_band_image", ocrBandImages.tenthFrameFile, ocrBandImages.tenthFrameFile.name || "tenth-frame-band.png");
         }
 
         frameImages.forEach(({ frame, file }) => {
@@ -1726,8 +1754,17 @@ const handleFinalSettlement = async () => {
         }
 
         const cumulativeScores = getCumulativeScoresFromData(data);
+        const finalScoreFromBands = Number(tesseractFinalScoreResult?.score);
+        const dataWithBandEvidence = {
+          ...data,
+          cumulativeScores,
+          finalScore:
+            Number.isFinite(finalScoreFromBands) && finalScoreFromBands >= 0 && finalScoreFromBands <= 300
+              ? finalScoreFromBands
+              : data.finalScore,
+        };
         const advancedResult = buildAdvancedOcrResult({
-          data: { ...data, cumulativeScores },
+          data: dataWithBandEvidence,
           tesseractCumulativeScores: tesseractCumulativeResult?.scores || [],
           fallbackRolls: data.rolls,
         });
@@ -1748,7 +1785,7 @@ const handleFinalSettlement = async () => {
           previewFrames,
           reviewFrames,
           framesForRepair,
-          data: { ...data, cumulativeScores: advancedResult.cumulativeScores, finalScore: advancedResult.finalScore },
+          data: { ...dataWithBandEvidence, cumulativeScores: advancedResult.cumulativeScores, finalScore: advancedResult.finalScore },
           needsRetry,
           splitFrames: advancedResult.splitFrames || [],
           advancedResult,

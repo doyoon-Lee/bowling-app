@@ -221,3 +221,28 @@ export async function analyzeFramesWithTesseract(frameImages = []) {
 
   return results;
 }
+
+export async function analyzeFinalScoreWithTesseract(finalScoreFile) {
+  const worker = await getTesseractWorker();
+  if (!worker || !finalScoreFile) return { score: null, rawText: "", confidence: 0 };
+
+  try {
+    await setWorkerWhitelist(worker, TESSERACT_SCORE_WHITELIST);
+    const result = await worker.recognize(finalScoreFile);
+    const rawText = result?.data?.text || "";
+    const confidence = Number(result?.data?.confidence ?? 0);
+    const candidates = extractScoreCandidates(rawText)
+      .filter((value) => value >= 0 && value <= 300)
+      .sort((a, b) => String(b).length - String(a).length || b - a);
+
+    return {
+      score: candidates.length > 0 ? candidates[0] : null,
+      rawText,
+      confidence,
+      source: "tesseract_final_score",
+    };
+  } catch (error) {
+    console.warn("Tesseract final score OCR failed:", error);
+    return { score: null, rawText: "", confidence: 0 };
+  }
+}

@@ -36,7 +36,7 @@ function sharpenImageData(imageData, amount = 0.45) {
   return imageData;
 }
 
-function normalizeImageData(imageData, { contrast = 1.45, brightness = 10, threshold = false } = {}) {
+function normalizeImageData(imageData, { contrast = 1.45, brightness = 10, threshold = false, invert = false } = {}) {
   const { data } = imageData;
 
   for (let index = 0; index < data.length; index += 4) {
@@ -45,6 +45,10 @@ function normalizeImageData(imageData, { contrast = 1.45, brightness = 10, thres
 
     if (threshold) {
       value = value >= 155 ? 255 : 0;
+    }
+
+    if (invert) {
+      value = 255 - value;
     }
 
     data[index] = value;
@@ -63,6 +67,9 @@ export function preprocessScoreCanvas(sourceCanvas, options = {}) {
     maxWidth = 2200,
     paddingRatio = 0.035,
     threshold = false,
+    invert = false,
+    contrast = 1.45,
+    brightness = 10,
   } = options;
 
   const scale = Math.max(1, Math.min(maxWidth / sourceCanvas.width, minWidth / sourceCanvas.width));
@@ -80,7 +87,7 @@ export function preprocessScoreCanvas(sourceCanvas, options = {}) {
   ctx.drawImage(sourceCanvas, paddingX, paddingY, scaledWidth, scaledHeight);
 
   let imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-  imageData = normalizeImageData(imageData, { threshold });
+  imageData = normalizeImageData(imageData, { threshold, invert, contrast, brightness });
   imageData = sharpenImageData(imageData, 0.38);
   ctx.putImageData(imageData, 0, 0);
 
