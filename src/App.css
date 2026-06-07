@@ -3559,3 +3559,35 @@ body {
 .compactReviewCard {
   box-shadow: none;
 }
+
+.frameMarkTokens {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  white-space: nowrap;
+}
+
+.frameMarkSeparator {
+  color: #94a3b8;
+  font-weight: 800;
+}
+
+.splitRollMark {
+  width: 20px;
+  height: 20px;
+  border: 2px solid #ef4444;
+  border-radius: 999px;
+  color: #dc2626;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  line-height: 1;
+  font-weight: 900;
+  background: #fff7ed;
+}
+
+.geminiScoreFrameMark .splitRollMark,
+.frameMark .splitRollMark {
+  font-size: 12px;
+}

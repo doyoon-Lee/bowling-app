@@ -390,6 +390,37 @@ function getFinalMismatch(rolls = [], finalScore = null, cumulativeScores = []) 
   return actual === null || Math.abs(actual - target) > 0;
 }
 
+function normalizeSplitFrameNumbers(data = {}) {
+  const splitFrames = new Set();
+
+  const addFrame = (value) => {
+    const frameNo = Number(value);
+    if (Number.isInteger(frameNo) && frameNo >= 1 && frameNo <= 10) splitFrames.add(frameNo);
+  };
+
+  const directLists = [data.splitFrames, data.split_frames, data.splits, data.splitFrameNumbers];
+  directLists.forEach((list) => {
+    if (Array.isArray(list)) list.forEach(addFrame);
+  });
+
+  if (Array.isArray(data.frames)) {
+    data.frames.forEach((frame) => {
+      const flag = frame?.isSplit ?? frame?.split ?? frame?.splitLeave ?? frame?.is_split;
+      if (flag === true || flag === "true" || flag === 1 || flag === "Y") addFrame(frame?.frame);
+    });
+  }
+
+  return [...splitFrames].sort((a, b) => a - b);
+}
+
+function attachSplitMetadataToFrames(frames = [], splitFrames = []) {
+  const splitSet = new Set(splitFrames.map(Number));
+  return (Array.isArray(frames) ? frames : []).map((frame) => ({
+    ...frame,
+    isSplit: Boolean(frame?.isSplit || frame?.split || splitSet.has(Number(frame?.frame))),
+  }));
+}
+
 export function buildAdvancedOcrResult({ data = {}, tesseractCumulativeScores = [], fallbackRolls = [] } = {}) {
   const geminiCumulativeScores = normalizeScores(data.cumulativeScores || data.cumulative_scores);
   const cumulativeScores = pickBestCumulativeScores({
@@ -425,13 +456,15 @@ export function buildAdvancedOcrResult({ data = {}, tesseractCumulativeScores = 
     cumulativeScores,
     finalScore,
   }), cumulativeScores);
-  const previewFrames = calcBowlingScore(repairedRolls).frames;
+  const splitFrames = normalizeSplitFrameNumbers(data);
+  const previewFrames = attachSplitMetadataToFrames(calcBowlingScore(repairedRolls).frames, splitFrames);
   const finalMismatch = getFinalMismatch(repairedRolls, finalScore, cumulativeScores);
   const scoreReliability = getScoreReliability(cumulativeScores);
 
   return {
     repairedRolls,
     previewFrames,
+    splitFrames,
     cumulativeScores,
     finalScore,
     scoreReliability,

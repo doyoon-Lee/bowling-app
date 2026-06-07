@@ -1,5 +1,6 @@
 import React from "react";
-import { calcBowlingScore, getPreview, renderFrameMark } from "../utils/bowling.jsx";
+import { calcBowlingScore, getPreview } from "../utils/bowling.jsx";
+import FrameMarkDisplay from "./FrameMarkDisplay";
 
 export default function OCRModal({
   scoreImage,
@@ -95,7 +96,7 @@ export default function OCRModal({
                 <div className="geminiScoreFrame" key={frame.frame}>
                   <div className="geminiScoreFrameNo">{frame.frame}</div>
                   <div className="geminiScoreFrameMark">
-                    {renderFrameMark(getPreview(frame))}
+                    <FrameMarkDisplay mark={getPreview(frame)} isSplit={Boolean(frame?.isSplit || frame?.split)} />
                   </div>
                 </div>
               ))}

@@ -24,6 +24,7 @@ export function buildGeminiBowlingOcrPrompt({ previousResult = null, retryAttemp
 - 위쪽 프레임별 투구 기호
 - 아래쪽 프레임별 누적 점수
 - 오른쪽 또는 하단의 최종 점수(finalScore)
+- 스플릿 표시: 첫 투구 숫자 주위에 원, 네모, 색상 강조, 분리 표시가 있으면 해당 프레임을 isSplit으로 표시
 
 허용 문자:
 - X
@@ -49,6 +50,7 @@ export function buildGeminiBowlingOcrPrompt({ previousResult = null, retryAttemp
 - 첫 투구가 X면 두번째 투구 없음
 - 10프레임은 최대 3구 가능
 - 10프레임 보너스 투구를 절대 누락하지 마라
+- 스플릿은 점수값을 바꾸지 않는다. rolls는 그대로 두고 해당 frame.isSplit=true로만 표시한다
 - 불가능한 조합은 가장 가까운 볼링 규칙으로 수정
 - 확실하지 않으면 null 사용
 
@@ -58,6 +60,7 @@ export function buildGeminiBowlingOcrPrompt({ previousResult = null, retryAttemp
 - 9프레임 누적 192, finalScore 222인데 10프레임이 X X로 보이면 X X X일 가능성이 높다.
 - 1프레임 9/ 후 2프레임 누적점수가 40이면 2프레임은 9/가 아니라 X일 가능성이 높다.
 - X 표시가 삼각형/화살표/검은 리본처럼 보일 수 있다. 같은 모양이 반복되고 누적점수가 30씩 증가하면 X로 판단한다.
+- 첫 투구 숫자 주변에 원/박스/색상 강조가 있으면 스플릿 가능성이 높다. 이 경우 투구값은 바꾸지 말고 isSplit=true로 반환한다.
 - X와 9/가 헷갈리면 cumulativeScores를 우선한다.
 - 8, 6, 9 숫자가 헷갈리면 점수 차이로 역산한다.
 
@@ -94,11 +97,13 @@ previous_result_json이 존재하면 이전 분석 결과가 틀렸을 가능성
     {
       "frame": 1,
       "rolls": ["X"],
-      "confidence": 0.98
+      "confidence": 0.98,
+      "isSplit": false
     }
   ],
   "cumulativeScores": [20, 40, 56, 76, 106, 134, 153, 162, 192, 222],
   "finalScore": 222,
+  "splitFrames": [7],
   "confidence": 0.92,
   "notes": "10프레임 재검토"
 }
@@ -106,6 +111,8 @@ previous_result_json이 존재하면 이전 분석 결과가 틀렸을 가능성
 중요 반환 규칙:
 - rolls는 전체 게임 투구값을 순서대로 펼친 배열이다.
 - frames는 1~10프레임별 투구값 배열이다.
+- frame.isSplit은 해당 프레임의 첫 투구가 스플릿으로 표시되었는지 여부다. 확실하지 않으면 false 또는 생략한다.
+- splitFrames는 스플릿으로 보이는 프레임 번호 배열이다.
 - rolls와 frames가 서로 모순되면 cumulativeScores와 finalScore에 맞는 값을 선택한다.
 - null을 사용해야 할 경우 rolls에는 넣지 말고 해당 frame.rolls에만 null을 사용한다.
 - JSON 객체 외의 텍스트를 절대 출력하지 않는다.`;

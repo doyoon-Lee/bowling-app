@@ -358,6 +358,7 @@ export default function App() {
   const [ocrPreviewRolls, setOcrPreviewRolls] = useState([]);
   const [ocrRawText, setOcrRawText] = useState("");
   const [geminiPreviewFrames, setGeminiPreviewFrames] = useState([]);
+  const [scoreSplitFrames, setScoreSplitFrames] = useState([]);
   const [ocrFramePreviews, setOcrFramePreviews] = useState([]);
   const [ocrReviewFrames, setOcrReviewFrames] = useState([]);
   const [analysisAttempt, setAnalysisAttempt] = useState(0);
@@ -569,6 +570,7 @@ const resetLocalRoomScoreForNextRound = ({ savedBy, roundNumber } = {}) => {
   const startedByOtherPlayer = savedBy && user?.id && savedBy !== user.id;
 
   setRolls([]);
+  setScoreSplitFrames([]);
   setPinFrames([]);
   setRoomScores([]);
 
@@ -840,6 +842,7 @@ const resetLocalRoomScoreForNextRound = ({ savedBy, roundNumber } = {}) => {
       localStorage.setItem(APP_LOGGED_OUT_KEY, "true");
       setSession(null);
       setRolls([]);
+      setScoreSplitFrames([]);
       setPinFrames([]);
       setPlayerName("");
       return;
@@ -848,6 +851,7 @@ const resetLocalRoomScoreForNextRound = ({ savedBy, roundNumber } = {}) => {
     localStorage.removeItem(APP_LOGGED_OUT_KEY);
     await client.auth.signOut();
     setRolls([]);
+    setScoreSplitFrames([]);
     setPinFrames([]);
     setPlayerName("");
   };
@@ -952,6 +956,7 @@ const handleFinishCurrentRound = async () => {
     if (user?.id) localStorage.removeItem(getLiveRoomDraftKey(roomId, user.id));
 
     setRolls([]);
+    setScoreSplitFrames([]);
     setPinFrames([]);
     setRoomScores([]);
     await refreshRoomRounds(roomId);
@@ -1745,6 +1750,7 @@ const handleFinalSettlement = async () => {
           framesForRepair,
           data: { ...data, cumulativeScores: advancedResult.cumulativeScores, finalScore: advancedResult.finalScore },
           needsRetry,
+          splitFrames: advancedResult.splitFrames || [],
           advancedResult,
         };
 
@@ -1769,6 +1775,7 @@ const handleFinalSettlement = async () => {
 
       setOcrPreviewRolls(bestResult.repairedRolls);
       setGeminiPreviewFrames(bestResult.previewFrames);
+      setScoreSplitFrames(bestResult.splitFrames || []);
       setOcrReviewFrames(bestResult.reviewFrames);
       setOcrRawText(`한 줄 전체 분석과 프레임 분석을 병합했습니다. ${getOcrReviewSummary(bestResult.reviewFrames)} ${bestResult.data.notes || `confidence: ${bestResult.data.confidence ?? "정보 없음"}`}`);
       setAnalysisAttempt((prev) => prev + 1);
@@ -1915,10 +1922,12 @@ const handleFinalSettlement = async () => {
 
   const addRoll = (pins) => {
     if (!next || pins > next.max) return;
+    setScoreSplitFrames([]);
     setRolls((prev) => [...prev, pins]);
   };
 
   const undo = () => {
+    setScoreSplitFrames([]);
     setRolls((prev) => prev.slice(0, -1));
   };
 
@@ -1929,6 +1938,7 @@ const handleFinalSettlement = async () => {
     }
 
     setRolls([]);
+    setScoreSplitFrames([]);
     setPinFrames([]);
   };
 
@@ -2030,6 +2040,7 @@ const handleFinalSettlement = async () => {
     }
 
     setRolls([]);
+    setScoreSplitFrames([]);
     setPinFrames([]);
   };
 
@@ -2127,7 +2138,7 @@ const handleFinalSettlement = async () => {
             </div>
           </div>
 
-          <Scoreboard result={result} scoreboardRef={scoreboardRef} />
+          <Scoreboard result={result} scoreboardRef={scoreboardRef} splitFrames={scoreSplitFrames} />
 
           {scoreMode === "beginner" ? (
             <BeginnerKeypad
