@@ -3495,3 +3495,67 @@ body {
     grid-template-columns: repeat(3, minmax(0, 1fr));
   }
 }
+
+/* Simple OCR result mode: hide noisy intermediate analysis from users */
+.simpleOcrResultBox {
+  border: 1px solid rgba(37, 99, 235, 0.18);
+  background: linear-gradient(180deg, rgba(239, 246, 255, 0.95), rgba(255, 255, 255, 0.98));
+}
+
+.simpleOcrResultHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.simpleOcrResultHeader div {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.simpleOcrResultHeader strong {
+  font-size: 16px;
+}
+
+.simpleOcrResultHeader span {
+  color: #64748b;
+  font-size: 12px;
+}
+
+.simpleOcrResultHeader b {
+  flex: 0 0 auto;
+  border-radius: 999px;
+  padding: 8px 12px;
+  background: #2563eb;
+  color: #fff;
+  font-size: 15px;
+}
+
+.simpleCorrectionBox {
+  background: transparent;
+  border: 0;
+  padding: 0;
+}
+
+.ocrCorrectionToggle {
+  width: 100%;
+  border: 1px solid rgba(100, 116, 139, 0.25);
+  border-radius: 12px;
+  padding: 12px 14px;
+  background: #fff;
+  color: #334155;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.compactReviewBox {
+  border-color: rgba(245, 158, 11, 0.32);
+  background: #fffbeb;
+}
+
+.compactReviewCard {
+  box-shadow: none;
+}

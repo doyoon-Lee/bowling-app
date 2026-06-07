@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useState } from "react";
 import { calcBowlingScore, getPreview, parseGeminiFrameRolls, renderFrameMark } from "../utils/bowling.jsx";
 
 export default function OCRModal({
@@ -25,6 +25,11 @@ export default function OCRModal({
 }) {
   const previewFrames = geminiPreviewFrames.length > 0 ? geminiPreviewFrames : calcBowlingScore(ocrPreviewRolls).frames;
   const reviewTargets = ocrReviewFrames.filter((frame) => frame.needsReview);
+  const criticalReviewTargets = reviewTargets.filter((frame) => {
+    const reasons = Array.isArray(frame.reasons) ? frame.reasons.join(" ") : "";
+    return frame.confidence < 0.45 || reasons.includes("최종점수") || reasons.includes("10프레임");
+  });
+  const [showManualCorrection, setShowManualCorrection] = useState(false);
 
   const updatePreviewFrameMark = (frameIndex, nextMark) => {
     const frameMarks = calcBowlingScore(ocrPreviewRolls).frames.map((frame) => frame.mark || "");
@@ -94,94 +99,67 @@ export default function OCRModal({
               </p>
             </div>
 
-            {ocrFramePreviews.length > 0 && (
-              <div className="ocrFramePreviewBox">
-                <div className="ocrFramePreviewHeader">
-                  <strong>프레임 단위 분석 영역</strong>
-                  <span>자동 경계 감지와 대비/선명도 보정이 적용된 프레임 이미지로 인식합니다.</span>
-                </div>
-                <div className="ocrFramePreviewGrid">
-                  {ocrFramePreviews.map((item) => (
-                    <div className="ocrFramePreviewCell" key={`ocr-frame-preview-${item.frame}`}>
-                      <span>{item.frame}F</span>
-                      <img src={item.url} alt={`${item.frame}프레임 분석 영역`} />
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
           </div>
         )}
 
         {cameraMessage && <div className="placeMessage">{cameraMessage}</div>}
 
 
-        {ocrPreviewRolls.length > 0 && (
-          <div className={reviewTargets.length > 0 ? "ocrReviewBox needsReview" : "ocrReviewBox stable"}>
+        {ocrPreviewRolls.length > 0 && criticalReviewTargets.length > 0 && (
+          <div className="ocrReviewBox needsReview compactReviewBox">
             <div className="ocrReviewHeader">
               <div>
-                <strong>{reviewTargets.length > 0 ? "확인 필요한 프레임" : "검토 결과"}</strong>
-                <span>신뢰도, 누적점수 검산, Gemini/Tesseract 비교 결과를 기준으로 표시합니다.</span>
+                <strong>확인이 필요한 부분이 있어요</strong>
+                <span>대부분은 자동 검산했습니다. 아래 프레임만 실제 화면과 비교해주세요.</span>
               </div>
-              <b>{reviewTargets.length > 0 ? `${reviewTargets.length}개 확인` : "확인 필요 없음"}</b>
+              <b>{criticalReviewTargets.length}개 확인</b>
             </div>
 
-            {reviewTargets.length > 0 ? (
-              <div className="ocrReviewList">
-                {reviewTargets.map((item) => {
-                  const currentFrame = previewFrames[item.frame - 1];
-                  const currentMark = renderFrameMark(getPreview(currentFrame || {})).replace(/\u00A0/g, "").trim();
-                  const quickMarks = item.frame === 10
-                    ? ["X|X|X", "X|9|/", "X|-|/", "9|/|X", "9|-", "-|/"]
-                    : ["X", "9|/", "8|/", "7|/", "9|-", "8|1", "-|-", "-|/"];
+            <div className="ocrReviewList">
+              {criticalReviewTargets.map((item) => {
+                const currentFrame = previewFrames[item.frame - 1];
+                const currentMark = renderFrameMark(getPreview(currentFrame || {})).replace(/\u00A0/g, "").trim();
+                const quickMarks = item.frame === 10
+                  ? ["X|X|X", "X|9|/", "X|-|/", "9|/|X", "9|-", "-|/"]
+                  : ["X", "9|/", "8|/", "7|/", "9|-", "8|1", "-|-", "-|/"];
 
-                  return (
-                    <div className="ocrReviewCard" key={`ocr-review-${item.frame}`}>
-                      <div className="ocrReviewCardTop">
-                        <div>
-                          <strong>{item.frame}프레임</strong>
-                          <span>신뢰도 {item.confidencePercent}% · {item.selectedSource === "tesseract" ? "Tesseract 선택" : "Gemini 선택"}</span>
-                        </div>
-                        <em>{currentMark || "미인식"}</em>
+                return (
+                  <div className="ocrReviewCard compactReviewCard" key={`ocr-critical-review-${item.frame}`}>
+                    <div className="ocrReviewCardTop">
+                      <div>
+                        <strong>{item.frame}프레임</strong>
+                        <span>{item.reasons?.[0] || "인식 결과 확인 필요"}</span>
                       </div>
-
-                      {item.imageUrl && (
-                        <img className="ocrReviewFrameImage" src={item.imageUrl} alt={`${item.frame}프레임 원본`} />
-                      )}
-
-                      <div className="ocrReviewReasons">
-                        {item.reasons.map((reason) => <span key={`${item.frame}-${reason}`}>{reason}</span>)}
-                      </div>
-
-                      <div className="ocrQuickMarks">
-                        {quickMarks.map((mark) => (
-                          <button type="button" key={`${item.frame}-${mark}`} onClick={() => updatePreviewFrameMark(item.frame - 1, mark)}>
-                            {mark.replace(/\|/g, " | ")}
-                          </button>
-                        ))}
-                      </div>
-
-                      <label className="ocrReviewManualInput">
-                        직접 수정
-                        <input
-                          value={currentMark}
-                          placeholder={item.frame === 10 ? "X|X|X" : "X 또는 9|/"}
-                          onChange={(event) => updatePreviewFrameMark(item.frame - 1, event.target.value)}
-                        />
-                      </label>
+                      <em>{currentMark || "미인식"}</em>
                     </div>
-                  );
-                })}
-              </div>
-            ) : (
-              <p className="ocrReviewStableText">모든 프레임이 안정적으로 인식되었습니다. 그래도 실제 점수판과 한 번만 비교한 뒤 적용해주세요.</p>
-            )}
+
+                    {item.imageUrl && (
+                      <img className="ocrReviewFrameImage" src={item.imageUrl} alt={`${item.frame}프레임 원본`} />
+                    )}
+
+                    <div className="ocrQuickMarks">
+                      {quickMarks.map((mark) => (
+                        <button type="button" key={`${item.frame}-${mark}`} onClick={() => updatePreviewFrameMark(item.frame - 1, mark)}>
+                          {mark.replace(/\|/g, " | ")}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
           </div>
         )}
 
         {ocrPreviewRolls.length > 0 && (
-          <div className="ocrPreviewBox">
-            <strong>혼합 OCR 분석 투구값</strong>
+          <div className="ocrPreviewBox simpleOcrResultBox">
+            <div className="simpleOcrResultHeader">
+              <div>
+                <strong>분석 결과</strong>
+                <span>내부 검산을 마친 최종 결과만 표시합니다.</span>
+              </div>
+              <b>{calcBowlingScore(ocrPreviewRolls).total}점</b>
+            </div>
             <div className="geminiScoreboardPreview">
               {previewFrames.map((frame) => (
                 <div className="geminiScoreFrame" key={frame.frame}>
@@ -196,24 +174,32 @@ export default function OCRModal({
         )}
 
         {ocrPreviewRolls.length > 0 && (
-          <div className="ocrCorrectionBox">
-            <div className="ocrCorrectionHeader">
-              <strong>인식 결과 빠른 수정</strong>
-              <span>틀린 프레임만 직접 고친 뒤 적용하세요.</span>
-            </div>
-            <div className="ocrCorrectionGrid">
-              {calcBowlingScore(ocrPreviewRolls).frames.map((frame, index) => (
-                <label className="ocrCorrectionCell" key={`ocr-correct-${frame.frame}`}>
-                  <span>{frame.frame}F</span>
-                  <input
-                    value={renderFrameMark(frame.mark).replace(/\u00A0/g, "").trim()}
-                    placeholder={frame.frame === 10 ? "X|X|X" : "X 또는 9|/"}
-                    onChange={(event) => updatePreviewFrameMark(index, event.target.value)}
-                  />
-                </label>
-              ))}
-            </div>
-            <p>예: 스트라이크는 X, 스페어는 9|/, 거터는 -, 10프레임은 X|9|/ 처럼 입력</p>
+          <div className="ocrCorrectionBox simpleCorrectionBox">
+            <button type="button" className="ocrCorrectionToggle" onClick={() => setShowManualCorrection((prev) => !prev)}>
+              {showManualCorrection ? "수정 닫기" : "결과가 다르면 직접 수정"}
+            </button>
+
+            {showManualCorrection && (
+              <>
+                <div className="ocrCorrectionHeader">
+                  <strong>인식 결과 수정</strong>
+                  <span>틀린 프레임만 고친 뒤 적용하세요.</span>
+                </div>
+                <div className="ocrCorrectionGrid">
+                  {calcBowlingScore(ocrPreviewRolls).frames.map((frame, index) => (
+                    <label className="ocrCorrectionCell" key={`ocr-correct-${frame.frame}`}>
+                      <span>{frame.frame}F</span>
+                      <input
+                        value={renderFrameMark(frame.mark).replace(/\u00A0/g, "").trim()}
+                        placeholder={frame.frame === 10 ? "X|X|X" : "X 또는 9|/"}
+                        onChange={(event) => updatePreviewFrameMark(index, event.target.value)}
+                      />
+                    </label>
+                  ))}
+                </div>
+                <p>예: 스트라이크는 X, 스페어는 9|/, 거터는 -, 10프레임은 X|9|/ 처럼 입력</p>
+              </>
+            )}
           </div>
         )}
 
@@ -228,7 +214,7 @@ export default function OCRModal({
         )}
 
         <p className="cameraGuide">
-          Gemini Vision과 Tesseract 숫자 OCR을 함께 사용합니다. 선택 영역을 프레임 단위로 나눈 뒤 두 결과를 비교하고, 적용 전 투구값을 꼭 확인해주세요.
+          Gemini Vision과 Tesseract 숫자 OCR, 프레임 분리, 누적점수 검산은 내부적으로 처리됩니다. 화면에는 최종 결과만 간단히 표시합니다.
         </p>
       </div>
     </div>
