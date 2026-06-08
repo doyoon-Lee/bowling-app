@@ -18,6 +18,7 @@ export default function History({ sortedDateKeys, groupedRecords, onDeleteRecord
 
   const [selectedMonth, setSelectedMonth] = useState("all");
   const [selectedDate, setSelectedDate] = useState("all");
+  const [isMonthPickerOpen, setIsMonthPickerOpen] = useState(false);
 
   useEffect(() => {
     if (selectedMonth !== "all" && !monthKeys.includes(selectedMonth)) {
@@ -54,23 +55,19 @@ export default function History({ sortedDateKeys, groupedRecords, onDeleteRecord
       ) : (
         <>
           <div className="historyControls">
-            <label>
+            <div className="historyPickerField">
               <span>월 선택</span>
-              <select
-                value={selectedMonth}
-                onChange={(event) => {
-                  setSelectedMonth(event.target.value);
-                  setSelectedDate("all");
-                }}
+              <button
+                type="button"
+                className="historyPickerButton"
+                onClick={() => setIsMonthPickerOpen(true)}
+                aria-haspopup="dialog"
+                aria-expanded={isMonthPickerOpen}
               >
-                <option value="all">전체 기간</option>
-                {monthKeys.map((monthKey) => (
-                  <option value={monthKey} key={monthKey}>
-                    {getMonthLabel(monthKey)}
-                  </option>
-                ))}
-              </select>
-            </label>
+                <strong>{selectedMonth === "all" ? "전체 기간" : getMonthLabel(selectedMonth)}</strong>
+                <em>변경</em>
+              </button>
+            </div>
 
             <div className="historySummaryPills">
               <span>{monthRecords.length}게임</span>
@@ -78,6 +75,58 @@ export default function History({ sortedDateKeys, groupedRecords, onDeleteRecord
               <span>HIGH {getDayHigh(monthRecords)}</span>
             </div>
           </div>
+
+
+          {isMonthPickerOpen && (
+            <div
+              className="pickerOverlay"
+              role="dialog"
+              aria-modal="true"
+              aria-label="월 선택"
+              onClick={() => setIsMonthPickerOpen(false)}
+            >
+              <div className="pickerSheet" onClick={(event) => event.stopPropagation()}>
+                <div className="pickerHandle" aria-hidden="true" />
+                <div className="pickerHeader">
+                  <div>
+                    <span>날짜별 기록</span>
+                    <strong>조회할 월을 선택하세요</strong>
+                  </div>
+                  <button type="button" onClick={() => setIsMonthPickerOpen(false)}>닫기</button>
+                </div>
+
+                <div className="pickerOptionList">
+                  {["all", ...monthKeys].map((monthKey) => {
+                    const isAll = monthKey === "all";
+                    const label = isAll ? "전체 기간" : getMonthLabel(monthKey);
+                    const count = isAll
+                      ? sortedDateKeys.length
+                      : sortedDateKeys.filter((dateKey) => getMonthKey(dateKey) === monthKey).length;
+                    const isActive = selectedMonth === monthKey;
+
+                    return (
+                      <button
+                        type="button"
+                        key={monthKey}
+                        className={isActive ? "pickerOption active" : "pickerOption"}
+                        onClick={() => {
+                          setSelectedMonth(monthKey);
+                          setSelectedDate("all");
+                          setIsMonthPickerOpen(false);
+                        }}
+                      >
+                        <span>
+                          <strong>{label}</strong>
+                          <em>{count}일 기록</em>
+                        </span>
+                        <b aria-hidden="true">{isActive ? "✓" : ""}</b>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            </div>
+          )}
 
           <div className="dateChipScroller" aria-label="날짜 선택">
             <button

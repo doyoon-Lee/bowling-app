@@ -3639,177 +3639,225 @@ body {
   }
 }
 
-/* OCR photo selection: use the available modal width so mobile photos do not sit
-   inside a narrow preview with unused dark side space. The actual crop math still
-   uses the rendered image bounds. */
-.ocrPhotoModal {
-  max-width: min(760px, calc(100vw - 18px));
-  padding: 14px;
+/* Custom picker UI: avoids native Android/iOS select dialogs. */
+.historyPickerField {
+  display: grid;
+  gap: 8px;
 }
 
-.ocrPhotoModal .cropImageWrap {
-  width: 100%;
-  background: transparent;
-  border: none;
-  border-radius: 18px;
-  overflow: visible;
+.historyPickerField > span {
+  color: #64748b;
+  font-size: 12px;
+  font-weight: 900;
+  text-align: center;
 }
 
-.ocrPhotoModal .cropImageStage {
+.historyPickerButton {
   width: 100%;
-  display: block;
-  background: #0f172a;
-  border-radius: 18px;
+  min-height: 48px;
+  border: 1px solid #bfdbfe;
+  border-radius: 16px;
+  background: linear-gradient(180deg, #ffffff 0%, #f8fbff 100%);
+  color: #0f172a;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 0 14px 0 16px;
+  box-shadow: 0 8px 24px rgba(2, 132, 199, 0.08);
+  cursor: pointer;
+}
+
+.historyPickerButton strong {
+  font-size: 15px;
+  font-weight: 950;
+}
+
+.historyPickerButton em {
+  font-style: normal;
+  color: #0284c7;
+  background: #e0f2fe;
+  border-radius: 999px;
+  padding: 6px 10px;
+  font-size: 12px;
+  font-weight: 900;
+}
+
+.pickerOverlay {
+  position: fixed;
+  inset: 0;
+  z-index: 2200;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  padding: 16px;
+  background: rgba(15, 23, 42, 0.48);
+  backdrop-filter: blur(5px);
+}
+
+.pickerSheet {
+  width: min(460px, 100%);
+  max-height: min(560px, calc(100vh - 56px));
   overflow: hidden;
+  border: 1px solid rgba(191, 219, 254, 0.9);
+  border-radius: 28px;
+  background: #ffffff;
+  box-shadow: 0 28px 80px rgba(15, 23, 42, 0.28);
+  animation: pickerSheetUp 180ms ease-out;
 }
 
-.ocrPhotoModal .cropImageStage .scoreImagePreview {
+@keyframes pickerSheetUp {
+  from {
+    transform: translateY(18px);
+    opacity: 0.65;
+  }
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+
+.pickerHandle {
+  width: 42px;
+  height: 5px;
+  border-radius: 999px;
+  background: #cbd5e1;
+  margin: 10px auto 4px;
+}
+
+.pickerHeader {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 14px;
+  padding: 14px 18px 12px;
+  border-bottom: 1px solid #e2e8f0;
+}
+
+.pickerHeader span {
+  display: block;
+  color: #0284c7;
+  font-size: 12px;
+  font-weight: 900;
+}
+
+.pickerHeader strong {
+  display: block;
+  margin-top: 3px;
+  color: #0f172a;
+  font-size: 18px;
+  font-weight: 950;
+}
+
+.pickerHeader button {
+  border: 0;
+  border-radius: 999px;
+  background: #e2e8f0;
+  color: #334155;
+  padding: 8px 12px;
+  font-size: 12px;
+  font-weight: 900;
+  cursor: pointer;
+}
+
+.pickerOptionList {
+  max-height: 400px;
+  overflow-y: auto;
+  padding: 10px;
+}
+
+.pickerOption {
   width: 100%;
-  height: auto;
-  max-width: none;
-  max-height: none;
-  object-fit: fill;
-  background: #0f172a;
+  border: 1px solid transparent;
+  border-radius: 18px;
+  background: #ffffff;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 14px 14px;
+  text-align: left;
+  cursor: pointer;
 }
 
-@media (max-width: 520px) {
-  .placeModalBackdrop {
-    padding: 8px;
-  }
+.pickerOption + .pickerOption {
+  margin-top: 6px;
+}
 
-  .ocrPhotoModal {
-    max-width: calc(100vw - 16px);
+.pickerOption span {
+  display: grid;
+  gap: 3px;
+}
+
+.pickerOption strong {
+  color: #0f172a;
+  font-size: 17px;
+  font-weight: 950;
+}
+
+.pickerOption em {
+  color: #64748b;
+  font-size: 12px;
+  font-style: normal;
+  font-weight: 800;
+}
+
+.pickerOption b {
+  width: 30px;
+  height: 30px;
+  flex: 0 0 30px;
+  border-radius: 50%;
+  border: 2px solid #cbd5e1;
+  display: grid;
+  place-items: center;
+  color: #ffffff;
+  font-size: 15px;
+}
+
+.pickerOption.active {
+  border-color: #7dd3fc;
+  background: #eff6ff;
+}
+
+.pickerOption.active b {
+  border-color: #0284c7;
+  background: #0284c7;
+}
+
+@media (min-width: 641px) {
+  .pickerOverlay {
+    align-items: center;
+  }
+}
+
+@media (max-width: 640px) {
+  .pickerOverlay {
     padding: 10px;
-    border-radius: 22px;
   }
 
-  .ocrPhotoModal .cropImageStage {
-    border-radius: 16px;
+  .pickerSheet {
+    border-radius: 24px 24px 20px 20px;
+    max-height: min(480px, calc(100vh - 32px));
   }
-}
 
-/* Compact mobile OCR modal layout: keep the wider preview but reduce vertical
-   padding/gaps so selecting a score row requires less scrolling on phones. */
-@media (max-width: 520px) {
-  .ocrPhotoModal {
-    max-height: calc(100dvh - 12px);
-    overflow-y: auto;
+  .pickerHeader {
+    padding: 12px 14px 10px;
+  }
+
+  .pickerHeader strong {
+    font-size: 16px;
+  }
+
+  .pickerOptionList {
+    max-height: 330px;
     padding: 8px;
-    border-radius: 18px;
   }
 
-  .ocrPhotoModal .placeModalHeader {
-    margin-bottom: 6px;
-    gap: 8px;
+  .pickerOption {
+    padding: 12px 12px;
   }
 
-  .ocrPhotoModal .placeModalHeader strong {
-    font-size: 15px;
-  }
-
-  .ocrPhotoModal .placeModalHeader span {
-    font-size: 11px;
-    line-height: 1.25;
-  }
-
-  .ocrPhotoModal .placeModalHeader button {
-    padding: 7px 10px;
-    border-radius: 10px;
-    font-size: 12px;
-  }
-
-  .ocrPhotoModal .cropPanel {
-    gap: 6px;
-  }
-
-  .ocrPhotoModal .cropToolbar {
-    margin-bottom: 6px;
-    padding: 7px 8px;
-    border-radius: 12px;
-    gap: 6px;
-  }
-
-  .ocrPhotoModal .cropToolbarText {
-    min-height: 0;
-    font-size: 11px;
-  }
-
-  .ocrPhotoModal .cropToolbar button {
-    padding: 7px 9px;
-    border-radius: 10px;
-    font-size: 11px;
-  }
-
-  .ocrPhotoModal .cropImageWrap {
-    margin: 0;
-  }
-
-  .ocrPhotoModal .cropImageStage {
-    border-radius: 12px;
-  }
-
-  .ocrPhotoModal .ocrShootGuide {
-    margin-top: 6px;
-    padding: 8px 10px;
-    border-radius: 12px;
-  }
-
-  .ocrPhotoModal .ocrShootGuide strong {
-    font-size: 12px;
-    margin-bottom: 4px;
-  }
-
-  .ocrPhotoModal .ocrShootGuide ul {
-    padding-left: 16px;
-    font-size: 11px;
-    line-height: 1.35;
-  }
-
-  .ocrPhotoModal .placeMessage {
-    margin: 6px 0;
-    padding: 8px 10px;
-    font-size: 12px;
-    border-radius: 12px;
-  }
-
-  .ocrPhotoModal .ocrPreviewBox {
-    margin: 8px 0;
-    padding: 9px;
-    border-radius: 14px;
-  }
-
-  .ocrPhotoModal .simpleOcrResultHeader {
-    margin-bottom: 8px;
-    gap: 8px;
-  }
-
-  .ocrPhotoModal .simpleOcrResultHeader strong {
-    font-size: 14px;
-  }
-
-  .ocrPhotoModal .simpleOcrResultHeader span {
-    font-size: 11px;
-  }
-
-  .ocrPhotoModal .simpleOcrResultHeader b {
-    padding: 6px 9px;
-    font-size: 13px;
-  }
-
-  .ocrPhotoModal .geminiScoreboardPreview {
-    gap: 5px;
-  }
-
-  .ocrPhotoModal .manualPlaceButton {
-    margin-top: 7px;
-    padding: 11px 12px;
-    border-radius: 13px;
-    font-size: 14px;
-  }
-
-  .ocrPhotoModal .cameraGuide {
-    margin: 7px 0 0;
-    font-size: 11px;
-    line-height: 1.35;
+  .pickerOption strong {
+    font-size: 16px;
   }
 }
