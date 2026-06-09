@@ -3602,19 +3602,19 @@ body {
   line-height: 1.35;
 }
 
-/* Mobile OCR crop accuracy fix: crop coordinates are now measured on the
-   actual rendered image, not the full modal/wrapper area. This prevents
-   object-fit/max-height letterboxing from shifting the selected score row. */
+/* Mobile OCR crop accuracy fix: crop coordinates are measured on the
+   actual rendered image. The preview now fills the modal width so portrait
+   photos do not create black side margins from max-height letterboxing. */
 .cropImageWrap {
-  display: flex;
-  justify-content: center;
-  align-items: center;
+  display: block;
   padding: 0;
+  background: #f8fafc;
 }
 
 .cropImageStage {
   position: relative;
-  display: inline-block;
+  display: block;
+  width: 100%;
   max-width: 100%;
   line-height: 0;
   touch-action: none;
@@ -3623,20 +3623,15 @@ body {
 
 .cropImageStage .scoreImagePreview {
   display: block;
-  width: auto;
+  width: 100%;
+  height: auto;
   max-width: 100%;
-  max-height: 340px;
-  object-fit: contain;
+  max-height: none;
+  object-fit: fill;
   border-radius: 0;
   border: none;
-  background: #0f172a;
+  background: #f8fafc;
   pointer-events: none;
-}
-
-@media (max-width: 520px) {
-  .cropImageStage .scoreImagePreview {
-    max-height: 300px;
-  }
 }
 
 /* Custom picker UI: avoids native Android/iOS select dialogs. */
