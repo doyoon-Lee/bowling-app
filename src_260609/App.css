@@ -498,7 +498,7 @@ input {
 
 .pinDeckWrap {
   border: 1px solid #dbeafe;
-  border-radius: 22px;
+  border-radius: 20px;
   background: white;
   padding: 14px;
 }
@@ -509,102 +509,43 @@ input {
 
 .pinDeck {
   position: relative;
-  width: min(286px, 100%);
-  height: 236px;
+  width: 260px;
+  height: 230px;
   margin: 0 auto;
-  border-radius: 0;
-  background: transparent;
-  box-shadow: none;
-  overflow: visible;
 }
 
 .deckPin {
   position: absolute;
-  width: 42px;
-  height: 64px;
-  border: none;
-  background: transparent;
-  color: #17345d;
+  width: 46px;
+  height: 46px;
+  border-radius: 50%;
+  border: 2px solid #cbd5e1;
+  background: white;
+  color: #0f172a;
   font-weight: 900;
-  padding: 0;
-  transform: translate(-50%, -50%);
-  transition: transform 0.14s ease, opacity 0.14s ease, filter 0.14s ease;
-  filter: drop-shadow(0 4px 5px rgba(15, 23, 42, 0.22));
-}
-
-.deckPin:active:not(:disabled) {
-  transform: translate(-50%, -50%) scale(0.94);
-}
-
-.deckPinSvg {
-  position: absolute;
-  inset: 0;
-  width: 100%;
-  height: 100%;
-  display: block;
-  overflow: visible;
-}
-
-.deckPinBodyPath {
-  stroke: #c7d6e6;
-  stroke-width: 1.6;
-}
-
-.deckPinStripe {
-  fill: #ef4444;
-  opacity: 0.94;
-}
-
-.deckPinHighlight {
-  fill: rgba(255, 255, 255, 0.72);
-}
-
-.deckPinBaseShadow {
-  fill: rgba(15, 23, 42, 0.16);
-}
-
-.deckPinNumber {
-  position: absolute;
-  left: 50%;
-  top: 39px;
-  width: 26px;
-  height: 20px;
-  color: #17345d;
-  font-size: 15px;
-  line-height: 20px;
-  text-align: center;
-  transform: translateX(-50%);
-  text-shadow: 0 1px 0 rgba(255, 255, 255, 0.95);
-  z-index: 2;
+  box-shadow: 0 4px 10px rgba(15, 23, 42, 0.08);
 }
 
 .deckPin.selected {
-  filter: drop-shadow(0 5px 7px rgba(14, 116, 144, 0.28)) drop-shadow(0 0 7px rgba(125, 211, 252, 0.55));
-}
-
-.deckPin.selected .deckPinBodyPath {
-  stroke: #38bdf8;
-}
-
-.deckPin.selected .deckPinNumber {
-  color: #0369a1;
+  background: #facc15;
+  border-color: #eab308;
+  color: #111827;
 }
 
 .deckPin:disabled {
-  opacity: 0.18;
-  filter: grayscale(1);
+  opacity: 0.25;
 }
 
-.p7 { left: 69px; top: 43px; }
-.p8 { left: 118px; top: 43px; }
-.p9 { left: 167px; top: 43px; }
-.p10 { left: 216px; top: 43px; }
-.p4 { left: 94px; top: 94px; }
-.p5 { left: 142px; top: 94px; }
-.p6 { left: 190px; top: 94px; }
-.p2 { left: 118px; top: 145px; }
-.p3 { left: 166px; top: 145px; }
-.p1 { left: 142px; top: 196px; }
+.p7 { left: 12px; top: 8px; }
+.p8 { left: 76px; top: 8px; }
+.p9 { left: 140px; top: 8px; }
+.p10 { left: 204px; top: 8px; }
+.p4 { left: 44px; top: 66px; }
+.p5 { left: 108px; top: 66px; }
+.p6 { left: 172px; top: 66px; }
+.p2 { left: 76px; top: 124px; }
+.p3 { left: 140px; top: 124px; }
+.p1 { left: 108px; top: 182px; }
 
 .proPrimaryButton,
 .proSubButton {
